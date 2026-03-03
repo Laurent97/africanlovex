@@ -1,0 +1,37 @@
+<svg
+  width="180"
+  height="180"
+  viewBox="0 0 180 180"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <linearGradient id="appleIconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#F59E0B" />
+      <stop offset="50%" stopColor="#EC4899" />
+      <stop offset="100%" stopColor="#8B5CF6" />
+    </linearGradient>
+    <linearGradient id="appleIconGradient2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#10B981" />
+      <stop offset="100%" stopColor="#3B82F6" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background with rounded corners -->
+  <rect width="180" height="180" rx="40" fill="url(#appleIconGradient)" />
+  
+  <!-- X shape representing connection -->
+  <path
+    d="M45 45 L135 135 M135 45 L45 135"
+    stroke="white"
+    strokeWidth="12"
+    strokeLinecap="round"
+  />
+  
+  <!-- Connection dots -->
+  <circle cx="90" cy="90" r="8" fill="url(#appleIconGradient2)" />
+  <circle cx="55" cy="55" r="6" fill="white" />
+  <circle cx="125" cy="125" r="6" fill="white" />
+  <circle cx="125" cy="55" r="6" fill="url(#appleIconGradient2)" />
+  <circle cx="55" cy="125" r="6" fill="url(#appleIconGradient2)" />
+</svg>
