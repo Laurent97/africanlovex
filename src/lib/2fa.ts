@@ -1,5 +1,6 @@
 // Two-Factor Authentication Library
 // Handles TOTP (Time-based One-Time Password) generation and verification
+// Fixed: Resolved method naming conflict and recursive call issue
 
 export interface TwoFactorSecret {
   secret: string;
