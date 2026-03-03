@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* LoveX Brand - Rwandan Inspired */
+    --background: 0 100% 98%;
+    --foreground: 0 0% 8%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+
+    --primary: 352 85% 43%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 43 100% 50%;
+    --secondary-foreground: 0 0% 8%;
+
+    --muted: 20 30% 95%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 271 69% 35%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 20 20% 90%;
+    --input: 20 20% 90%;
+    --ring: 352 85% 43%;
+
+    --radius: 1rem;
+
+    /* LoveX Custom Tokens */
+    --lovex-red: 352 85% 43%;
+    --lovex-gold: 43 100% 50%;
+    --lovex-blue: 210 80% 51%;
+    --lovex-green: 122 54% 33%;
+    --lovex-purple: 271 69% 35%;
+    --lovex-orange: 14 90% 54%;
+    --lovex-sand: 36 68% 87%;
+    --lovex-lava: 14 89% 40%;
+    --lovex-teal: 187 100% 28%;
+
+    --gradient-sunset: linear-gradient(135deg, hsl(14, 90%, 54%) 0%, hsl(352, 85%, 43%) 100%);
+    --gradient-love: linear-gradient(120deg, hsl(352, 85%, 43%) 0%, hsl(14, 90%, 54%) 50%, hsl(43, 100%, 50%) 100%);
+    --gradient-royal: linear-gradient(90deg, hsl(271, 69%, 35%) 0%, hsl(43, 100%, 50%) 100%);
+    --gradient-hills: linear-gradient(45deg, hsl(122, 54%, 33%) 0%, hsl(210, 80%, 51%) 100%);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 20%;
+    --sidebar-primary: 352 85% 43%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 20 30% 95%;
+    --sidebar-accent-foreground: 0 0% 20%;
+    --sidebar-border: 20 20% 90%;
+    --sidebar-ring: 352 85% 43%;
+  }
+
+  .dark {
+    --background: 0 0% 5%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 352 85% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 43 100% 50%;
+    --secondary-foreground: 0 0% 8%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 271 69% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 352 85% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer components {
+  .imigongo-pattern {
+    background-image: repeating-linear-gradient(
+      45deg,
+      hsl(352, 85%, 43%, 0.03) 0px,
+      hsl(352, 85%, 43%, 0.03) 8px,
+      transparent 8px,
+      transparent 16px
+    );
+  }
+
+  .imigongo-pattern-2 {
+    background-image:
+      linear-gradient(45deg, transparent 75%, hsl(43, 100%, 50%, 0.03) 75%),
+      linear-gradient(-45deg, transparent 75%, hsl(352, 85%, 43%, 0.03) 75%);
+    background-size: 20px 20px;
+  }
+
+  .gradient-sunset-bg {
+    background: linear-gradient(135deg, hsl(14, 90%, 54%) 0%, hsl(352, 85%, 43%) 100%);
+  }
+
+  .gradient-love-bg {
+    background: linear-gradient(120deg, hsl(352, 85%, 43%) 0%, hsl(14, 90%, 54%) 50%, hsl(43, 100%, 50%) 100%);
+  }
+
+  .gradient-royal-bg {
+    background: linear-gradient(90deg, hsl(271, 69%, 35%) 0%, hsl(43, 100%, 50%) 100%);
+  }
+
+  .text-gradient-love {
+    background: linear-gradient(120deg, hsl(352, 85%, 43%) 0%, hsl(14, 90%, 54%) 50%, hsl(43, 100%, 50%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-royal {
+    background: linear-gradient(90deg, hsl(271, 69%, 35%) 0%, hsl(43, 100%, 50%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .lovex-card {
+    @apply bg-card rounded-[32px_32px_16px_32px] shadow-xl border border-border/50 overflow-hidden;
+  }
+
+  .lovex-badge {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold;
+  }
+}
+
+@layer utilities {
+  .hover-lift {
+    @apply transition-all duration-300;
+  }
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -12px hsl(352, 85%, 43%, 0.2);
+  }
+}
