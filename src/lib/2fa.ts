@@ -61,7 +61,7 @@ export class TwoFactorAuth {
   }
 
   // Generate complete 2FA setup
-  static async generateSecret(email: string): Promise<TwoFactorSecret> {
+  static async generateTwoFactorSetup(email: string): Promise<TwoFactorSecret> {
     const secret = this.generateSecret();
     const qrCodeURL = this.generateQRCodeURL(secret, email);
     const qrCode = await this.generateQRCode(qrCodeURL);

@@ -879,7 +879,7 @@ const Settings = () => {
     try {
       if (twoFactorStep === 'setup') {
         // Generate 2FA secret and QR code
-        const { secret, qrCode } = await twoFactorAuth.generateSecret(userData.email);
+        const { secret, qrCode } = await twoFactorAuth.generateTwoFactorSetup(userData.email);
         setTwoFactorSecret(secret);
         setTwoFactorQR(qrCode);
         setTwoFactorStep('verify');
