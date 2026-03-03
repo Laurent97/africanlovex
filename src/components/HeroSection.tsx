@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import heroBg from "@/assets/hero-bg.jpg";
+import Logo from "./Logo";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -83,16 +84,16 @@ export default function HeroSection() {
       </div>
 
       <div className="relative z-10 container mx-auto px-6 py-20 text-center">
-        {/* Animated Logo with Romantic Glow */}
+        {/* Animated Logo with Modern Design */}
         <motion.div
           initial={{ scale: 0, rotate: -180 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: "spring", stiffness: 200, damping: 15 }}
           className="mb-8"
         >
-          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-r from-rose-500 via-pink-500 to-purple-600 shadow-2xl animate-pulse-glow relative">
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-rose-400 to-purple-500 blur-xl opacity-70" />
-            <Heart className="w-12 h-12 text-white fill-white relative z-10" />
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-r from-amber-500 via-pink-500 to-purple-600 shadow-2xl animate-pulse-glow relative">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400 to-purple-500 blur-xl opacity-70" />
+            <Logo />
           </div>
         </motion.div>
 
