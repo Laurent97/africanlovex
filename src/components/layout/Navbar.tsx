@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
+import { createClient } from '@supabase/supabase-js';
 import { 
   Search,
   Bell,
@@ -25,13 +26,93 @@ import {
 
 export const Navbar = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   const { user, userProfile, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Initialize Supabase client
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY
+  );
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth/login');
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+      setIsSearchOpen(false);
+    }
+  };
+
+  const handleSearchInputChange = (value: string) => {
+    setSearchQuery(value);
+  };
+
+  // Load notification counts
+  useEffect(() => {
+    if (user) {
+      loadNotificationCounts();
+      setupRealtimeSubscriptions();
+    }
+  }, [user]);
+
+  const loadNotificationCounts = async () => {
+    try {
+      // Load unread notifications
+      const { count: notificationCount } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user?.id)
+        .eq('read', false);
+
+      // Load unread messages from conversations
+      const { data: conversations } = await supabase
+        .rpc('get_user_conversations', { user_uuid: user?.id });
+
+      // Count unread messages (mock logic - you'd implement this based on your message read status)
+      const messageCount = conversations?.length || 0;
+
+      setUnreadNotifications(notificationCount || 0);
+      setUnreadMessages(messageCount);
+    } catch (error) {
+      console.error('Error loading notification counts:', error);
+      // Fallback to zero if there's an error
+      setUnreadNotifications(0);
+      setUnreadMessages(0);
+    }
+  };
+
+  const setupRealtimeSubscriptions = () => {
+    // Subscribe to new notifications
+    const notificationSubscription = supabase
+      .channel('navbar-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user?.id}`
+        },
+        () => {
+          loadNotificationCounts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(notificationSubscription);
+    };
   };
 
   return (
@@ -43,7 +124,7 @@ export const Navbar = () => {
             variant="ghost"
             size="sm"
             className="lg:hidden"
-            onClick={() => {/* Mobile menu toggle */}}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             <Menu className="w-5 h-5" />
           </Button>
@@ -60,13 +141,18 @@ export const Navbar = () => {
           flex-1 max-w-md mx-4
           ${isSearchOpen ? 'block' : 'hidden md:block'}
         `}>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Search people..."
-              className="pl-10 pr-4"
-            />
-          </div>
+          <form onSubmit={handleSearch}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search people..."
+                className="pl-10 pr-4"
+                value={searchQuery}
+                onChange={(e) => handleSearchInputChange(e.target.value)}
+              />
+            </div>
+          </form>
         </div>
 
         {/* Right Actions */}
@@ -82,19 +168,33 @@ export const Navbar = () => {
           </Button>
 
           {/* Notifications */}
-          <Button variant="ghost" size="sm" className="relative">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="relative"
+            onClick={() => navigate('/notifications')}
+          >
             <Bell className="w-5 h-5" />
-            <Badge className="absolute -top-1 -right-1 w-4 h-4 p-0 flex items-center justify-center text-xs">
-              3
-            </Badge>
+            {unreadNotifications > 0 && (
+              <Badge className="absolute -top-1 -right-1 w-4 h-4 p-0 flex items-center justify-center text-xs bg-rose-500">
+                {unreadNotifications > 99 ? '99+' : unreadNotifications}
+              </Badge>
+            )}
           </Button>
 
           {/* Messages */}
-          <Button variant="ghost" size="sm" className="relative">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="relative"
+            onClick={() => navigate('/chat')}
+          >
             <MessageCircle className="w-5 h-5" />
-            <Badge className="absolute -top-1 -right-1 w-4 h-4 p-0 flex items-center justify-center text-xs">
-              5
-            </Badge>
+            {unreadMessages > 0 && (
+              <Badge className="absolute -top-1 -right-1 w-4 h-4 p-0 flex items-center justify-center text-xs bg-blue-500">
+                {unreadMessages > 99 ? '99+' : unreadMessages}
+              </Badge>
+            )}
           </Button>
 
           {/* Coins */}
@@ -148,6 +248,126 @@ export const Navbar = () => {
           </DropdownMenu>
         </div>
       </div>
+      
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden">
+          <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg">
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
+                    <Heart className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="font-bold text-lg">LoveX</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  ×
+                </Button>
+              </div>
+            </div>
+            
+            <nav className="p-4 space-y-2">
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  navigate('/dashboard');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Home
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  navigate('/search');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Discover
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  navigate('/matching');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Matching
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  navigate('/chat');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Chat
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  navigate('/live');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Live
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  navigate('/gifts');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Gifts
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  navigate('/wallet');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Wallet
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  navigate('/settings');
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Settings
+              </Button>
+              <div className="border-t pt-2">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-red-600"
+                  onClick={() => {
+                    handleSignOut();
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  Log out
+                </Button>
+              </div>
+            </nav>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

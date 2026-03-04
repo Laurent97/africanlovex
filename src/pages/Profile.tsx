@@ -797,9 +797,95 @@ const Profile = () => {
         </div>
 
         <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Photos */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            {/* Left Column - Photos & Profile Info */}
+            <div className="xl:col-span-2 space-y-6">
+              {/* Profile Card */}
+              <Card className="border-0 shadow-sm overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="text-center mb-6">
+                    <div className="relative inline-block">
+                      <Avatar className="w-24 h-24 mx-auto mb-3 ring-4 ring-purple-100">
+                        <AvatarImage 
+                          src={profileData.avatar_url || getMainPhotoUrl(profileData.photos)} 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '';
+                          }}
+                        />
+                        <AvatarFallback className="text-2xl bg-gradient-to-br from-purple-600 to-pink-600 text-white">
+                          {profileData.full_name?.[0]?.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <label
+                        htmlFor="avatar-upload"
+                        className="absolute bottom-0 right-0 w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-purple-700 transition-colors"
+                      >
+                        {uploadingAvatar ? (
+                          <Loader2 className="w-4 h-4 text-white animate-spin" />
+                        ) : (
+                          <Camera className="w-4 h-4 text-white" />
+                        )}
+                        <input
+                          id="avatar-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleAvatarUpload}
+                          disabled={uploadingAvatar}
+                        />
+                      </label>
+
+                      {profileData.avatar_url && (
+                        <button
+                          onClick={handleDeleteAvatar}
+                          className="absolute top-0 right-0 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4 text-white" />
+                        </button>
+                      )}
+                      
+                      {profileData.is_verified && verificationStatus?.badge_type && (
+                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+                          <VerificationBadge 
+                            level={verificationStatus.badge_type} 
+                            size="sm" 
+                            animated={true} 
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">
+                      {profileData.full_name}, {profileData.age}
+                    </h2>
+                    
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-2">
+                      <MapPin className="w-4 h-4" />
+                      <span>{profileData.city}, {profileData.country}</span>
+                    </div>
+
+                    {/* Verification Status */}
+                    <div className="flex items-center justify-center text-sm mb-4">
+                      {profileData.is_verified && verificationStatus?.badge_type ? (
+                        <div className="flex items-center gap-2">
+                          <VerificationBadge 
+                            level={verificationStatus.badge_type} 
+                            size="sm" 
+                            showTooltip={false}
+                          />
+                          <span className="text-green-600 font-medium">Verified</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-orange-600">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>Not Verified</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
               {/* Photos Section */}
               <Card className="border-0 shadow-sm overflow-hidden">
                 <CardHeader className="pb-4 border-b border-gray-200">
@@ -1332,80 +1418,11 @@ const Profile = () => {
               </Card>
             </div>
 
-            {/* Right Column - Stats & Info */}
+            {/* Right Column - Stats & Actions */}
             <div className="space-y-6">
-              {/* Profile Card */}
+              {/* Stats Card */}
               <Card className="border-0 shadow-sm overflow-hidden">
                 <CardContent className="p-6">
-                  <div className="text-center mb-6">
-                    <div className="relative inline-block">
-                      <Avatar className="w-24 h-24 mx-auto mb-3 ring-4 ring-purple-100">
-                        <AvatarImage 
-                          src={profileData.avatar_url || getMainPhotoUrl(profileData.photos)} 
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = '';
-                          }}
-                        />
-                        <AvatarFallback className="text-2xl bg-gradient-to-br from-purple-600 to-pink-600 text-white">
-                          {profileData.full_name?.[0]?.toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      <label
-                        htmlFor="avatar-upload"
-                        className="absolute bottom-0 right-0 w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-purple-700 transition-colors"
-                      >
-                        {uploadingAvatar ? (
-                          <Loader2 className="w-4 h-4 text-white animate-spin" />
-                        ) : (
-                          <Camera className="w-4 h-4 text-white" />
-                        )}
-                        <input
-                          id="avatar-upload"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarUpload}
-                          disabled={uploadingAvatar}
-                        />
-                      </label>
-
-                      {profileData.avatar_url && (
-                        <button
-                          onClick={handleDeleteAvatar}
-                          className="absolute top-0 right-0 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4 text-white" />
-                        </button>
-                      )}
-                      
-                      {profileData.is_verified && verificationStatus?.badge_type && (
-                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                          <VerificationBadge 
-                            level={verificationStatus.badge_type} 
-                            size="sm" 
-                            animated={true} 
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <h2 className="text-xl font-bold text-gray-900 mb-1">
-                      {profileData.full_name}, {profileData.age}
-                    </h2>
-                    
-                    <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-2">
-                      <MapPin className="w-4 h-4" />
-                      <span>{profileData.city}, {profileData.country}</span>
-                    </div>
-
-                    {profileData.vip_tier !== 'free' && (
-                      <Badge className={`bg-gradient-to-r ${getVipBadgeColor(profileData.vip_tier)} text-white border-0 px-3 py-1`}>
-                        {profileData.vip_tier.toUpperCase()} MEMBER
-                      </Badge>
-                    )}
-                  </div>
-
                   {/* Stats Grid */}
                   <div className="grid grid-cols-3 gap-4 text-center mb-6">
                     <div>
@@ -1422,36 +1439,75 @@ const Profile = () => {
                     </div>
                   </div>
 
-                  {/* Verification Prompt for Unverified Users */}
-                  {!profileData.is_verified && (
-                    <Card className="border-purple-200 bg-purple-50 shadow-sm overflow-hidden">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <Shield className="w-5 h-5 text-purple-600" />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-purple-900 mb-1">Get Verified</h4>
-                            <p className="text-sm text-purple-700 mb-3">
-                              Verify your identity to get more matches and build trust with other users
-                            </p>
-                            <Link to="/verification">
-                              <Button 
-                                size="sm" 
-                                className="bg-purple-600 text-white hover:bg-purple-700"
-                              >
-                                <Camera className="w-4 h-4 mr-2" />
-                                Get Verified Now
-                              </Button>
-                            </Link>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                  {/* VIP Status */}
+                  {profileData.vip_tier !== 'free' && (
+                    <div className="text-center mb-6">
+                      <Badge className={`bg-gradient-to-r ${getVipBadgeColor(profileData.vip_tier)} text-white border-0 px-3 py-1`}>
+                        {profileData.vip_tier.toUpperCase()} MEMBER
+                      </Badge>
+                    </div>
                   )}
 
-                  {/* Quick Actions */}
-                  <div className="space-y-2">
+                  {/* Consolidated Verification Section */}
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <h3 className="font-semibold text-gray-900 mb-2">Verification Status</h3>
+                      {profileData.is_verified && verificationStatus?.badge_type ? (
+                        <div className="space-y-3">
+                          <div className="flex justify-center">
+                            <VerificationBadge 
+                              level={verificationStatus.badge_type} 
+                              size="lg" 
+                              animated={true} 
+                            />
+                          </div>
+                          <div className="text-sm text-green-600 font-medium">
+                            ✓ Verified {verificationStatus.badge_type} User
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-center gap-2 text-orange-600">
+                            <AlertCircle className="w-5 h-5" />
+                            <span className="font-medium">Not Verified</span>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            Get verified to build trust and get more matches
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {!profileData.is_verified && (
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                            <Shield className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-purple-900">Get Verified</h4>
+                            <p className="text-xs text-purple-700">
+                              Verify your identity to get more matches
+                            </p>
+                          </div>
+                        </div>
+                        <Link to="/verification">
+                          <Button className="w-full bg-purple-600 text-white hover:bg-purple-700">
+                            <Camera className="w-4 h-4 mr-2" />
+                            Get Verified Now
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card className="border-0 shadow-sm overflow-hidden">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                  <div className="space-y-3">
                     <VerificationGate feature="matching">
                       <Link to="/matching">
                         <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700">
@@ -1474,6 +1530,13 @@ const Profile = () => {
                       <Button variant="outline" className="w-full border-gray-300">
                         <Gift className="w-4 h-4 mr-2" />
                         Gift Store
+                      </Button>
+                    </Link>
+                    
+                    <Link to="/settings">
+                      <Button variant="outline" className="w-full border-gray-300">
+                        <Settings className="w-4 h-4 mr-2" />
+                        Settings
                       </Button>
                     </Link>
                   </div>
@@ -1502,20 +1565,6 @@ const Profile = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-500">Coins balance</span>
                       <span className="text-gray-900 font-medium">{profileData.coins_balance || 0} LX</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Verification</span>
-                      {profileData.is_verified && verificationStatus?.badge_type ? (
-                        <VerificationBadge 
-                          level={verificationStatus.badge_type} 
-                          size="sm" 
-                          showTooltip={false}
-                        />
-                      ) : (
-                        <Badge variant="secondary" className="bg-gray-100 text-gray-600">
-                          Not Verified
-                        </Badge>
-                      )}
                     </div>
                   </div>
                 </CardContent>

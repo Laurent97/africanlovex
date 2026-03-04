@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
+import { useKeyboard } from '@/hooks/useKeyboard';
 import { 
   User, 
   Bell, 
@@ -224,6 +225,7 @@ interface Session {
 }
 
 const Settings = () => {
+  const { isKeyboardVisible } = useKeyboard();
   const { user, signOut, updateUser } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -238,6 +240,7 @@ const Settings = () => {
   const [showExportData, setShowExportData] = useState(false);
   const [show2FASetup, setShow2FASetup] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
   
   // Real user data from database
   const [userData, setUserData] = useState({
@@ -439,14 +442,14 @@ const Settings = () => {
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
       // Get 2FA status
       const { data: twoFactor } = await supabase
         .from('user_security')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       // Use profile data or fallback to defaults
       const avatarUrl = profile?.avatar_url || '';
@@ -1160,27 +1163,38 @@ const Settings = () => {
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-200">
-          <div className="container mx-auto px-4 py-4">
+        {/* Mobile-First Header */}
+        <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200">
+          <div className="px-4 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              {/* Mobile Navigation */}
+              <div className="flex items-center gap-3">
                 <Button
                   onClick={() => navigate(-1)}
                   variant="ghost"
                   size="sm"
-                  className="text-gray-600 hover:text-gray-900"
+                  className="text-gray-600 hover:text-gray-900 p-2"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Settings</h1>
-                  <p className="text-sm text-gray-500">Manage your account and preferences</p>
+                  <h1 className="text-lg font-bold text-gray-900">Settings</h1>
+                  <p className="text-xs text-gray-500 hidden sm:block">Manage your account and preferences</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                {/* Search */}
+              <div className="flex items-center gap-2">
+                {/* Mobile Search Toggle */}
+                <Button
+                  onClick={() => setShowMobileSearch(!showMobileSearch)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-600 hover:text-gray-900 p-2 sm:hidden"
+                >
+                  <Search className="w-5 h-5" />
+                </Button>
+
+                {/* Desktop Search */}
                 <div className="relative hidden md:block">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
@@ -1196,45 +1210,176 @@ const Settings = () => {
                   onClick={handleSaveSettings}
                   disabled={isSaving}
                   size="sm"
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 min-w-[100px]"
                 >
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
+                      <span className="hidden sm:inline">Saving...</span>
+                      <span className="sm:hidden">...</span>
                     </>
                   ) : (
                     <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Changes
+                      <Save className="w-4 h-4 mr-2 hidden sm:inline" />
+                      <span className="hidden sm:inline">Save Changes</span>
+                      <span className="sm:hidden">Save</span>
                     </>
                   )}
                 </Button>
+              </div>
+            </div>
 
+            {/* Mobile Search Bar */}
+            <AnimatePresence>
+              {showMobileSearch && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="mt-3 overflow-hidden"
+                >
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="Search settings..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 pr-10 border-gray-300"
+                      autoFocus
+                    />
+                    <Button
+                      onClick={() => setShowMobileSearch(false)}
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1"
+                    >
+                      <X className="w-4 h-4 text-gray-400" />
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Mobile-First Layout */}
+        <div className="flex flex-col lg:flex-row">
+          {/* Mobile Navigation - Bottom Sheet Style */}
+          <div className="lg:hidden">
+            {/* User Profile Card */}
+            <div className="px-4 py-6 bg-white border-b border-gray-200">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Avatar className="w-16 h-16 ring-4 ring-purple-100">
+                    <AvatarImage src={userData.avatarUrl} />
+                    <AvatarFallback className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xl">
+                      {userData.fullName?.[0] || userData.email?.[0]?.toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Button
+                    size="sm"
+                    className="absolute bottom-0 right-0 rounded-full w-7 h-7 p-0 bg-purple-600 hover:bg-purple-700"
+                    onClick={() => document.getElementById('avatar-upload')?.click()}
+                  >
+                    <Camera className="w-3 h-3 text-white" />
+                  </Button>
+                  <input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    aria-label="Upload profile picture"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const formData = new FormData();
+                        formData.append('avatar', file);
+                        
+                        const { data, error } = await supabase.storage
+                          .from('avatars')
+                          .upload(`${user?.id}/avatar-${Date.now()}`, file);
+
+                        if (!error && data) {
+                          const { data: { publicUrl } } = supabase.storage
+                            .from('avatars')
+                            .getPublicUrl(data.path);
+
+                          await supabase
+                            .from('profiles')
+                            .update({ avatar_url: publicUrl })
+                            .eq('id', user?.id);
+
+                          await loadUserData();
+                          
+                          toast({
+                            title: "Avatar Updated",
+                            description: "Your profile picture has been updated."
+                          });
+                        }
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900">{userData.fullName || userData.username}</h3>
+                  <p className="text-sm text-gray-500 mb-1">{userData.email}</p>
+                  <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 text-xs">
+                    {userData.subscriptionTier === 'premium' ? <Crown className="w-3 h-3 mr-1" /> : null}
+                    {userData.subscriptionTier.charAt(0).toUpperCase() + userData.subscriptionTier.slice(1)}
+                  </Badge>
+                </div>
                 <Link to="/profile">
                   <Button variant="outline" size="sm" className="border-gray-300">
-                    <User className="w-4 h-4 mr-2" />
-                    Profile
+                    <User className="w-4 h-4" />
                   </Button>
                 </Link>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Sidebar */}
-            <div className="lg:col-span-3">
-              <Card className="border-0 shadow-sm overflow-hidden sticky top-24">
+            {/* Mobile Navigation Tabs */}
+            <div className="bg-white border-b border-gray-200">
+              <div className="px-4 py-3">
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                  {filteredSections.map((section) => (
+                    <button
+                      key={section.id}
+                      onClick={() => setActiveSection(section.id)}
+                      className={`flex-shrink-0 flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition-all duration-200 min-w-[80px] ${
+                        activeSection === section.id 
+                          ? 'bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200'
+                          : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className={`flex-shrink-0 ${
+                        activeSection === section.id ? 'text-purple-600' : 'text-gray-500'
+                      }`}>
+                        {section.icon}
+                      </div>
+                      <span className={`text-xs font-medium text-center ${
+                        activeSection === section.id ? 'text-purple-700' : 'text-gray-600'
+                      }`}>
+                        {section.label}
+                      </span>
+                      {section.count !== null && section.count > 0 && (
+                        <Badge className="bg-purple-600 text-white border-0 text-xs h-5 min-w-[20px]">
+                          {section.count}
+                        </Badge>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Sidebar */}
+          <div className="hidden lg:block lg:w-80 xl:w-96">
+            <div className="sticky top-24 p-4">
+              <Card className="border-0 shadow-sm overflow-hidden">
                 <CardContent className="p-4">
                   {/* User Info with Real Profile Picture */}
                   <div className="text-center mb-6 pb-6 border-b border-gray-200">
                     <div className="relative inline-block">
-                      {/* Debug info */}
-                      <div style={{ fontSize: '10px', color: 'red', position: 'absolute', top: '-30px', left: '0' }}>
-                        Avatar URL: {userData.avatarUrl || 'EMPTY'}
-                      </div>
                       <Avatar className="w-24 h-24 mx-auto mb-3 ring-4 ring-purple-100">
                         <AvatarImage src={userData.avatarUrl} />
                         <AvatarFallback className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-2xl">
@@ -1244,12 +1389,12 @@ const Settings = () => {
                       <Button
                         size="sm"
                         className="absolute bottom-0 right-0 rounded-full w-8 h-8 p-0 bg-purple-600 hover:bg-purple-700"
-                        onClick={() => document.getElementById('avatar-upload')?.click()}
+                        onClick={() => document.getElementById('avatar-upload-desktop')?.click()}
                       >
                         <Camera className="w-4 h-4 text-white" />
                       </Button>
                       <input
-                        id="avatar-upload"
+                        id="avatar-upload-desktop"
                         type="file"
                         accept="image/*"
                         className="hidden"
@@ -1297,7 +1442,7 @@ const Settings = () => {
                     )}
                   </div>
 
-                  {/* Navigation */}
+                  {/* Desktop Navigation */}
                   <nav className="space-y-1">
                     {filteredSections.map((section) => (
                       <button
@@ -1345,18 +1490,22 @@ const Settings = () => {
                 </CardContent>
               </Card>
             </div>
+          </div>
 
             {/* Main Content */}
-            <div className="lg:col-span-9">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeSection}
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -20, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-6"
-                >
+            <div className="flex-1 lg:ml-8">
+              <div className={`px-4 py-6 lg:p-0 transition-all duration-300 ${
+                isKeyboardVisible ? 'pb-safe' : ''
+              }`}>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeSection}
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -20, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="space-y-6"
+                  >
                   {/* Account Settings */}
                   {activeSection === 'account' && (
                     <>
@@ -1490,20 +1639,20 @@ const Settings = () => {
                           </div>
 
                           {/* Account Details */}
-                          <div className="grid grid-cols-2 gap-6">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                              <Label className="text-gray-700">Member Since</Label>
-                              <p className="mt-1 text-gray-900">
+                              <Label className="text-gray-700 text-sm">Member Since</Label>
+                              <p className="mt-1 text-gray-900 text-sm">
                                 {userData.createdAt.toLocaleDateString('en-US', { 
-                                  month: 'long', 
+                                  month: 'short', 
                                   year: 'numeric',
                                   day: 'numeric'
                                 })}
                               </p>
                             </div>
                             <div>
-                              <Label className="text-gray-700">Last Login</Label>
-                              <p className="mt-1 text-gray-900">
+                              <Label className="text-gray-700 text-sm">Last Login</Label>
+                              <p className="mt-1 text-gray-900 text-sm">
                                 {userData.lastSignIn.toLocaleDateString('en-US', { 
                                   month: 'short', 
                                   day: 'numeric',
@@ -1586,12 +1735,12 @@ const Settings = () => {
                             ].map((item) => (
                               <div key={item.key} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
+                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 flex-shrink-0">
                                     {item.icon}
                                   </div>
-                                  <div>
-                                    <Label className="text-gray-900">{item.label}</Label>
-                                    <p className="text-sm text-gray-500">{item.description}</p>
+                                  <div className="flex-1">
+                                    <Label className="text-gray-900 text-sm">{item.label}</Label>
+                                    <p className="text-xs text-gray-500">{item.description}</p>
                                   </div>
                                 </div>
                                 <Switch
@@ -1608,7 +1757,7 @@ const Settings = () => {
                         {/* Types */}
                         <div>
                           <h3 className="font-medium text-gray-900 mb-4">Notification Types</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
                               { key: 'newLikes', label: 'New Likes', icon: <Heart className="w-4 h-4" /> },
                               { key: 'newMatches', label: 'New Matches', icon: <Users className="w-4 h-4" /> },
@@ -1621,8 +1770,8 @@ const Settings = () => {
                             ].map((item) => (
                               <div key={item.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                 <div className="flex items-center gap-2">
-                                  <div className="text-gray-600">{item.icon}</div>
-                                  <Label className="text-gray-900">{item.label}</Label>
+                                  <div className="text-gray-600 flex-shrink-0">{item.icon}</div>
+                                  <Label className="text-gray-900 text-sm">{item.label}</Label>
                                 </div>
                                 <Switch
                                   checked={notifications[item.key]}
@@ -1660,12 +1809,12 @@ const Settings = () => {
                             ].map((item) => (
                               <div key={item.key} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
+                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 flex-shrink-0">
                                     {item.icon}
                                   </div>
-                                  <div>
-                                    <Label className="text-gray-900">{item.label}</Label>
-                                    <p className="text-sm text-gray-500">{item.description}</p>
+                                  <div className="flex-1">
+                                    <Label className="text-gray-900 text-sm">{item.label}</Label>
+                                    <p className="text-xs text-gray-500">{item.description}</p>
                                   </div>
                                 </div>
                                 <Switch
@@ -1692,12 +1841,12 @@ const Settings = () => {
                             ].map((item) => (
                               <div key={item.key} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
+                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 flex-shrink-0">
                                     {item.icon}
                                   </div>
-                                  <div>
-                                    <Label className="text-gray-900">{item.label}</Label>
-                                    <p className="text-sm text-gray-500">{item.description}</p>
+                                  <div className="flex-1">
+                                    <Label className="text-gray-900 text-sm">{item.label}</Label>
+                                    <p className="text-xs text-gray-500">{item.description}</p>
                                   </div>
                                 </div>
                                 <Switch
@@ -1721,12 +1870,12 @@ const Settings = () => {
                             ].map((item) => (
                               <div key={item.key} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
+                                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 flex-shrink-0">
                                     {item.icon}
                                   </div>
-                                  <div>
-                                    <Label className="text-gray-900">{item.label}</Label>
-                                    <p className="text-sm text-gray-500">{item.description}</p>
+                                  <div className="flex-1">
+                                    <Label className="text-gray-900 text-sm">{item.label}</Label>
+                                    <p className="text-xs text-gray-500">{item.description}</p>
                                   </div>
                                 </div>
                                 <Switch
@@ -1753,9 +1902,9 @@ const Settings = () => {
                       </CardHeader>
                       <CardContent className="p-6 space-y-6">
                         {/* Language & Region */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <Label htmlFor="language">Language</Label>
+                            <Label htmlFor="language" className="text-sm">Language</Label>
                             <Select 
                               value={preferences.language} 
                               onValueChange={(value) => setPreferences({ ...preferences, language: value })}
@@ -1774,7 +1923,7 @@ const Settings = () => {
                           </div>
 
                           <div>
-                            <Label htmlFor="showMe">Show Me</Label>
+                            <Label htmlFor="showMe" className="text-sm">Show Me</Label>
                             <Select 
                               value={preferences.showMe} 
                               onValueChange={(value: any) => setPreferences({ ...preferences, showMe: value })}
@@ -1793,8 +1942,8 @@ const Settings = () => {
 
                         {/* Age Range */}
                         <div>
-                          <Label>Age Range</Label>
-                          <div className="flex items-center gap-4 mt-1.5">
+                          <Label className="text-sm">Age Range</Label>
+                          <div className="flex items-center gap-3 mt-1.5">
                             <div className="flex-1">
                               <Input
                                 type="number"
@@ -1806,7 +1955,7 @@ const Settings = () => {
                                 max={100}
                               />
                             </div>
-                            <span className="text-gray-500">to</span>
+                            <span className="text-gray-500 text-sm">to</span>
                             <div className="flex-1">
                               <Input
                                 type="number"
@@ -1823,7 +1972,7 @@ const Settings = () => {
 
                         {/* Distance */}
                         <div>
-                          <Label htmlFor="distance">Maximum Distance (km)</Label>
+                          <Label htmlFor="distance" className="text-sm">Maximum Distance (km)</Label>
                           <Select 
                             value={preferences.preferredDistance} 
                             onValueChange={(value) => setPreferences({ ...preferences, preferredDistance: value })}
@@ -1963,19 +2112,19 @@ const Settings = () => {
                           <h3 className="font-medium text-gray-900 mb-4">Active Sessions</h3>
                           <div className="space-y-3">
                             {activeSessions.map((session) => (
-                              <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                              <div key={session.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                  <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
                                     {session.device.includes('iPhone') || session.device.includes('Android') ? (
                                       <Smartphone className="w-5 h-5 text-gray-600" />
                                     ) : (
                                       <Laptop className="w-5 h-5 text-gray-600" />
                                     )}
                                   </div>
-                                  <div>
-                                    <p className="font-medium text-gray-900">{session.device}</p>
-                                    <p className="text-sm text-gray-500">
-                                      {session.browser} • {session.location} • {session.ip}
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-gray-900 text-sm truncate">{session.device}</p>
+                                    <p className="text-xs text-gray-500">
+                                      {session.browser} • {session.location}
                                     </p>
                                     <p className="text-xs text-gray-400 mt-1">
                                       Last active: {session.lastActive.toLocaleString()}
@@ -1983,7 +2132,7 @@ const Settings = () => {
                                   </div>
                                 </div>
                                 {session.isCurrent ? (
-                                  <Badge className="bg-green-100 text-green-700 border-0">
+                                  <Badge className="bg-green-100 text-green-700 border-0 flex-shrink-0">
                                     Current
                                   </Badge>
                                 ) : (
@@ -1991,7 +2140,7 @@ const Settings = () => {
                                     onClick={() => handleTerminateSession(session.id)}
                                     variant="ghost"
                                     size="sm"
-                                    className="text-red-600 hover:text-red-700"
+                                    className="text-red-600 hover:text-red-700 flex-shrink-0"
                                   >
                                     <X className="w-4 h-4" />
                                   </Button>
@@ -2012,9 +2161,9 @@ const Settings = () => {
                           <h3 className="font-medium text-gray-900 mb-4">Recent Login Activity</h3>
                           <div className="space-y-3">
                             {activeSessions.slice(0, 5).map((session) => (
-                              <div key={session.id} className="flex items-center justify-between text-sm py-2 border-b border-gray-100 last:border-0">
+                              <div key={session.id} className="flex flex-col sm:flex-row sm:items-center justify-between text-sm py-2 border-b border-gray-100 last:border-0 gap-1">
                                 <span className="text-gray-600">{session.lastActive.toLocaleString()}</span>
-                                <span className="text-gray-900">{session.device}</span>
+                                <span className="text-gray-900 font-medium">{session.device}</span>
                                 <span className="text-gray-500">{session.location}</span>
                               </div>
                             ))}
@@ -2051,36 +2200,36 @@ const Settings = () => {
                         <CardContent className="p-6 space-y-4">
                           {/* Real payment methods from database */}
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <CreditCard className="w-5 h-5 text-purple-600" />
-                                <div>
-                                  <p className="font-medium text-gray-900">•••• 4242</p>
-                                  <p className="text-sm text-gray-500">Expires 12/24</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge className="bg-green-100 text-green-700 border-0">
-                                  Default
-                                </Badge>
-                                <Button variant="ghost" size="sm">
-                                  <Edit className="w-4 h-4" />
-                                </Button>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-gray-200 rounded-lg gap-3">
+                            <div className="flex items-center gap-3">
+                              <CreditCard className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                              <div>
+                                <p className="font-medium text-gray-900 text-sm">•••• 4242</p>
+                                <p className="text-xs text-gray-500">Expires 12/24</p>
                               </div>
                             </div>
-
-                            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <Smartphone className="w-5 h-5 text-green-600" />
-                                <div>
-                                  <p className="font-medium text-gray-900">MTN MoMo</p>
-                                  <p className="text-sm text-gray-500">{userData.phone}</p>
-                                </div>
-                              </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-green-100 text-green-700 border-0 text-xs">
+                                Default
+                              </Badge>
                               <Button variant="ghost" size="sm">
                                 <Edit className="w-4 h-4" />
                               </Button>
                             </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-gray-200 rounded-lg gap-3">
+                            <div className="flex items-center gap-3">
+                              <Smartphone className="w-5 h-5 text-green-600 flex-shrink-0" />
+                              <div>
+                                <p className="font-medium text-gray-900 text-sm">MTN MoMo</p>
+                                <p className="text-xs text-gray-500">{userData.phone}</p>
+                              </div>
+                            </div>
+                            <Button variant="ghost" size="sm">
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </div>
                           </div>
 
                           <Button variant="outline" className="w-full border-gray-300">
@@ -2093,7 +2242,7 @@ const Settings = () => {
                       {/* Current Subscription */}
                       <Card className="border-0 shadow-sm overflow-hidden bg-gradient-to-r from-purple-600 to-pink-600">
                         <CardContent className="p-6">
-                          <div className="flex items-center justify-between text-white">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between text-gray-900 gap-3">
                             <div>
                               <h3 className="text-lg font-semibold mb-1">
                                 {userData.subscriptionTier === 'vip' ? 'VIP' : 
@@ -2104,14 +2253,14 @@ const Settings = () => {
                                   Next billing: {userData.subscriptionExpiresAt.toLocaleDateString()}
                                 </p>
                               )}
-                              <div className="flex items-center gap-2">
-                                <Badge className="bg-white/20 text-white border-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge className="bg-white/20 text-white border-0 text-xs">
                                   {userData.subscriptionTier === 'vip' ? <Crown className="w-3 h-3 mr-1" /> :
                                    userData.subscriptionTier === 'premium' ? <Star className="w-3 h-3 mr-1" /> : null}
                                   {userData.subscriptionTier === 'free' ? 'Active' : 'Active'}
                                 </Badge>
                                 {userData.subscriptionTier !== 'free' && (
-                                  <Badge className="bg-white/20 text-white border-0">
+                                  <Badge className="bg-white/20 text-white border-0 text-xs">
                                     Auto-renew on
                                   </Badge>
                                 )}
@@ -2126,7 +2275,7 @@ const Settings = () => {
                                 {userData.subscriptionTier === 'free' ? 'Free forever' : 'per month'}
                               </p>
                               <Link to="/vip">
-                                <Button className="mt-4 bg-white text-purple-600 hover:bg-gray-100">
+                                <Button className="mt-4 bg-white text-purple-600 hover:bg-gray-100 w-full sm:w-auto">
                                   {userData.subscriptionTier === 'free' ? 'Upgrade' : 'Manage'}
                                   <ArrowRight className="w-4 h-4 ml-2" />
                                 </Button>
@@ -2145,24 +2294,24 @@ const Settings = () => {
                         </CardHeader>
                         <CardContent className="p-6">
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100 last:border-0 gap-2">
                               <div>
-                                <p className="font-medium text-gray-900">Premium Subscription</p>
-                                <p className="text-sm text-gray-500">March 15, 2024</p>
+                                <p className="font-medium text-gray-900 text-sm">Premium Subscription</p>
+                                <p className="text-xs text-gray-500">March 15, 2024</p>
                               </div>
                               <div className="text-right">
-                                <p className="font-medium text-gray-900">$9.99</p>
-                                <Badge className="bg-green-100 text-green-700 border-0">Paid</Badge>
+                                <p className="font-medium text-gray-900 text-sm">$9.99</p>
+                                <Badge className="bg-green-100 text-green-700 border-0 text-xs">Paid</Badge>
                               </div>
                             </div>
-                            <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b border-gray-100 last:border-0 gap-2">
                               <div>
-                                <p className="font-medium text-gray-900">Coin Purchase - 500 LX</p>
-                                <p className="text-sm text-gray-500">March 10, 2024</p>
+                                <p className="font-medium text-gray-900 text-sm">Coin Purchase - 500 LX</p>
+                                <p className="text-xs text-gray-500">March 10, 2024</p>
                               </div>
                               <div className="text-right">
-                                <p className="font-medium text-gray-900">$4.99</p>
-                                <Badge className="bg-green-100 text-green-700 border-0">Paid</Badge>
+                                <p className="font-medium text-gray-900 text-sm">$4.99</p>
+                                <Badge className="bg-green-100 text-green-700 border-0 text-xs">Paid</Badge>
                               </div>
                             </div>
                           </div>
@@ -2181,23 +2330,23 @@ const Settings = () => {
                       </CardHeader>
                       <CardContent className="p-6 space-y-4">
                         {connectedApps.map((app) => (
-                          <div key={app.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
+                          <div key={app.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow gap-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${app.color}20` }}>
+                              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${app.color}20` }}>
                                 <div style={{ color: app.color }}>{app.icon}</div>
                               </div>
-                              <div>
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                  <h4 className="font-medium text-gray-900">{app.name}</h4>
+                                  <h4 className="font-medium text-gray-900 text-sm truncate">{app.name}</h4>
                                   {app.connected && (
-                                    <Badge className="bg-green-100 text-green-700 border-0 text-xs">
+                                    <Badge className="bg-green-100 text-green-700 border-0 text-xs flex-shrink-0">
                                       Connected
                                     </Badge>
                                   )}
                                 </div>
                                 {app.connected ? (
                                   <div className="text-sm">
-                                    <p className="text-gray-600">
+                                    <p className="text-gray-600 text-xs">
                                       {app.username && `@${app.username}`}
                                       {app.email && ` • ${app.email}`}
                                     </p>
@@ -2208,7 +2357,7 @@ const Settings = () => {
                                     )}
                                   </div>
                                 ) : (
-                                  <p className="text-sm text-gray-500">
+                                  <p className="text-xs text-gray-500">
                                     {app.permissions?.length} permissions required
                                   </p>
                                 )}
@@ -2217,7 +2366,7 @@ const Settings = () => {
                             <Button
                               onClick={() => handleConnectApp(app.id)}
                               variant={app.connected ? 'outline' : 'default'}
-                              className={app.connected ? 'border-gray-300' : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700'}
+                              className={app.connected ? 'border-gray-300' : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 flex-shrink-0'}
                             >
                               {app.connected ? 'Disconnect' : 'Connect'}
                             </Button>
@@ -2239,15 +2388,15 @@ const Settings = () => {
                         {blockedUsers.length > 0 ? (
                           <div className="space-y-3">
                             {blockedUsers.map((user) => (
-                              <div key={user.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                              <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
                                 <div className="flex items-center gap-3">
-                                  <Avatar className="w-10 h-10">
+                                  <Avatar className="w-10 h-10 flex-shrink-0">
                                     <AvatarImage src={user.avatar} />
                                     <AvatarFallback>{user.name[0]}</AvatarFallback>
                                   </Avatar>
-                                  <div>
-                                    <h4 className="font-medium text-gray-900">{user.name}</h4>
-                                    <p className="text-sm text-gray-500">
+                                  <div className="min-w-0 flex-1">
+                                    <h4 className="font-medium text-gray-900 text-sm truncate">{user.name}</h4>
+                                    <p className="text-xs text-gray-500">
                                       Blocked on {new Date(user.blockedAt).toLocaleDateString()}
                                       {user.reason && ` • Reason: ${user.reason}`}
                                     </p>
@@ -2257,7 +2406,7 @@ const Settings = () => {
                                   onClick={() => handleUnblockUser(user.id)}
                                   variant="outline"
                                   size="sm"
-                                  className="border-purple-200 text-purple-600 hover:bg-purple-50"
+                                  className="border-purple-200 text-purple-600 hover:bg-purple-50 flex-shrink-0"
                                 >
                                   Unblock
                                 </Button>
@@ -2290,26 +2439,26 @@ const Settings = () => {
                       <CardContent className="p-6">
                         <div className="space-y-4">
                           {activeSessions.map((session) => (
-                            <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div key={session.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-lg gap-3">
                               <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
                                   {session.device.includes('iPhone') || session.device.includes('Android') ? (
                                     <Smartphone className="w-6 h-6 text-gray-600" />
                                   ) : (
                                     <Laptop className="w-6 h-6 text-gray-600" />
                                   )}
                                 </div>
-                                <div>
+                                <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2">
-                                    <p className="font-medium text-gray-900">{session.device}</p>
+                                    <p className="font-medium text-gray-900 text-sm truncate">{session.device}</p>
                                     {session.isCurrent && (
-                                      <Badge className="bg-green-100 text-green-700 border-0 text-xs">
+                                      <Badge className="bg-green-100 text-green-700 border-0 text-xs flex-shrink-0">
                                         Current
                                       </Badge>
                                     )}
                                   </div>
-                                  <p className="text-sm text-gray-600">
-                                    {session.browser} • {session.location} • {session.ip}
+                                  <p className="text-xs text-gray-600">
+                                    {session.browser} • {session.location}
                                   </p>
                                   <p className="text-xs text-gray-400 mt-1">
                                     Last active: {session.lastActive.toLocaleString()}
@@ -2321,7 +2470,7 @@ const Settings = () => {
                                   onClick={() => handleTerminateSession(session.id)}
                                   variant="ghost"
                                   size="sm"
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
                                 >
                                   <X className="w-4 h-4" />
                                 </Button>
@@ -2376,17 +2525,17 @@ const Settings = () => {
                             }
                           ].map((item, index) => (
                             <Link key={index} to={item.href}>
-                              <div className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200 gap-3">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0">
                                     {item.icon}
                                   </div>
                                   <div>
-                                    <h4 className="font-medium text-gray-900">{item.title}</h4>
-                                    <p className="text-sm text-gray-500">{item.description}</p>
+                                    <h4 className="font-medium text-gray-900 text-sm">{item.title}</h4>
+                                    <p className="text-xs text-gray-500">{item.description}</p>
                                   </div>
                                 </div>
-                                <ChevronRight className="w-5 h-5 text-gray-400" />
+                                <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
                               </div>
                             </Link>
                           ))}
@@ -2402,26 +2551,38 @@ const Settings = () => {
                       </Card>
                     </div>
                   )}
-                </motion.div>
-              </AnimatePresence>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Delete Account Confirmation Dialog */}
+          {/* Mobile Logout Button */}
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 pb-safe">
+            <Button
+              onClick={() => setShowLogoutConfirm(true)}
+              variant="outline"
+              className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+
+        {/* Mobile-Optimized Dialogs */}
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          <AlertDialogContent>
+          <AlertDialogContent className="max-w-md mx-4">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-red-600">Delete Account?</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDescription className="text-sm">
                 This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteAccount}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
               >
                 Delete Account
               </AlertDialogAction>
@@ -2429,20 +2590,19 @@ const Settings = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Logout Confirmation Dialog */}
         <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
-          <AlertDialogContent>
+          <AlertDialogContent className="max-w-md mx-4">
             <AlertDialogHeader>
               <AlertDialogTitle>Sign Out</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDescription className="text-sm">
                 Are you sure you want to sign out of your account?
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel className="w-full sm:w-auto">Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleLogout}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 w-full sm:w-auto"
               >
                 Sign Out
               </AlertDialogAction>
@@ -2450,31 +2610,30 @@ const Settings = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Change Password Dialog */}
         <Dialog open={showChangePassword} onOpenChange={setShowChangePassword}>
-          <DialogContent>
+          <DialogContent className="max-w-md mx-4">
             <DialogHeader>
               <DialogTitle>Change Password</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-sm">
                 Enter your current password and choose a new one.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
+                <Label htmlFor="current-password" className="text-sm">Current Password</Label>
                 <Input id="current-password" type="password" className="border-gray-300" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
+                <Label htmlFor="new-password" className="text-sm">New Password</Label>
                 <Input id="new-password" type="password" className="border-gray-300" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Label htmlFor="confirm-password" className="text-sm">Confirm New Password</Label>
                 <Input id="confirm-password" type="password" className="border-gray-300" />
               </div>
             </div>
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setShowChangePassword(false)}>
+            <div className="flex justify-end gap-3 flex-col sm:flex-row">
+              <Button variant="outline" onClick={() => setShowChangePassword(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
               <Button 
@@ -2483,7 +2642,7 @@ const Settings = () => {
                   const newPwd = (document.getElementById('new-password') as HTMLInputElement).value;
                   handleChangePassword(oldPwd, newPwd);
                 }}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white w-full sm:w-auto"
               >
                 Update Password
               </Button>
@@ -2491,46 +2650,45 @@ const Settings = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Export Data Dialog */}
         <Dialog open={showExportData} onOpenChange={setShowExportData}>
-          <DialogContent>
+          <DialogContent className="max-w-md mx-4">
             <DialogHeader>
               <DialogTitle>Export Your Data</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-sm">
                 We'll prepare a download link with all your personal data. This may take a few minutes.
               </DialogDescription>
             </DialogHeader>
             <div className="py-6">
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Check className="w-4 h-4 text-green-600" />
-                  Profile information
+                  <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span>Profile information</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Check className="w-4 h-4 text-green-600" />
-                  Photos and media
+                  <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span>Photos and media</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Check className="w-4 h-4 text-green-600" />
-                  Messages and conversations
+                  <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span>Messages and conversations</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Check className="w-4 h-4 text-green-600" />
-                  Match history
+                  <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span>Match history</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Check className="w-4 h-4 text-green-600" />
-                  Activity logs
+                  <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <span>Activity logs</span>
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setShowExportData(false)}>
+            <div className="flex justify-end gap-3 flex-col sm:flex-row">
+              <Button variant="outline" onClick={() => setShowExportData(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
               <Button
                 onClick={handleExportData}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white w-full sm:w-auto"
               >
                 <Download className="w-4 h-4 mr-2" />
                 Start Export
@@ -2539,16 +2697,15 @@ const Settings = () => {
           </DialogContent>
         </Dialog>
 
-        {/* 2FA Setup Dialog */}
         <Dialog open={show2FASetup} onOpenChange={setShow2FASetup}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md mx-4">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-lg">
                 {twoFactorStep === 'setup' && 'Set Up Two-Factor Authentication'}
                 {twoFactorStep === 'verify' && 'Verify Code'}
                 {twoFactorStep === 'backup' && 'Save Recovery Codes'}
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-sm">
                 {twoFactorStep === 'setup' && 'Scan the QR code with your authenticator app to enable 2FA.'}
                 {twoFactorStep === 'verify' && 'Enter the 6-digit code from your authenticator app.'}
                 {twoFactorStep === 'backup' && 'Save these recovery codes in a safe place. You can use them to access your account if you lose your phone.'}
@@ -2565,13 +2722,13 @@ const Settings = () => {
                   )}
                 </div>
                 <p className="text-sm text-gray-600 text-center mb-4">
-                  Or enter this code manually: <code className="bg-gray-100 px-2 py-1 rounded block mt-2 font-mono text-xs">
+                  Or enter this code manually: <code className="bg-gray-100 px-2 py-1 rounded block mt-2 font-mono text-xs break-all">
                     {twoFactorSecret}
                   </code>
                 </p>
                 <Button
                   onClick={handleEnable2FA}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white w-full"
                 >
                   Next
                 </Button>
@@ -2604,13 +2761,13 @@ const Settings = () => {
                 <div className="bg-gray-50 p-4 rounded-lg mb-4">
                   <div className="grid grid-cols-2 gap-2 font-mono text-sm">
                     {twoFactorBackupCodes.map((code, index) => (
-                      <div key={index} className="bg-white p-2 rounded border border-gray-200 text-center">
+                      <div key={index} className="bg-white p-2 rounded border border-gray-200 text-center text-xs break-all">
                         {code}
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-col sm:flex-row">
                   <Button
                     onClick={handleCopyRecoveryCodes}
                     variant="outline"

@@ -36,6 +36,9 @@ const VerificationCapture = lazy(() => import('./pages/verification/capture'));
 const VerificationProcessing = lazy(() => import('./pages/verification/processing'));
 const VerificationResult = lazy(() => import('./pages/verification/result'));
 const AuthTest = lazy(() => import('@/components/auth/AuthTest'));
+const SimpleSignupFlow = lazy(() => import('./pages/auth/SimpleSignupFlow'));
+const Login = lazy(() => import('./pages/Login'));
+const SystemBrowser = lazy(() => import('./pages/SystemBrowser'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 // Loading component for lazy loading
@@ -100,6 +103,30 @@ const App = () => (
               } 
             />
             <Route 
+              path="/auth/login" 
+              element={
+                <Suspense fallback={<LoadingSpinner />}>
+                  <Login />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/auth/register" 
+              element={
+                <Suspense fallback={<LoadingSpinner />}>
+                  <SimpleSignupFlow />
+                </Suspense>
+              } 
+            />
+            <Route 
+              path="/signup" 
+              element={
+                <Suspense fallback={<LoadingSpinner />}>
+                  <SimpleSignupFlow />
+                </Suspense>
+              } 
+            />
+            <Route 
               path="/privacy" 
               element={
                 <Suspense fallback={<LoadingSpinner />}>
@@ -131,6 +158,16 @@ const App = () => (
             />
             <Route 
               path="/discover" 
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <Search />
+                  </Suspense>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/search" 
               element={
                 <ProtectedRoute>
                   <Suspense fallback={<LoadingSpinner />}>
@@ -185,6 +222,16 @@ const App = () => (
                 <ProtectedRoute>
                   <Suspense fallback={<LoadingSpinner />}>
                     <Settings />
+                  </Suspense>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/browser" 
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <SystemBrowser />
                   </Suspense>
                 </ProtectedRoute>
               } 

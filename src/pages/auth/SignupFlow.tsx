@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useAuth } from '@/hooks/use-auth';
+import { signUpWithEmail } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 
@@ -36,13 +36,13 @@ interface SignupData {
   username: string;
   full_name: string;
   age: string;
-  gender: string;
+  gender: 'male' | 'female' | 'other';
   country: string;
   city: string;
   tribe: string;
   languages: string[];
   interests: string[];
-  relationship_intention: string;
+  relationship_intention: 'looking_for_love' | 'serious_only' | 'friends_first' | 'sugar_daddy' | 'sugar_mommy';
   bio: string;
   photos: string[];
   height: string;
@@ -55,7 +55,7 @@ interface SignupData {
 
 const SignupFlow: React.FC = () => {
   const navigate = useNavigate();
-  const { signUp } = useAuth();
+  // const { signUp } = useAuth(); // Removed - using new auth system
   const { toast } = useToast();
   
   const [currentStep, setCurrentStep] = useState(1);
@@ -71,7 +71,7 @@ const SignupFlow: React.FC = () => {
     username: '',
     full_name: '',
     age: '',
-    gender: '',
+    gender: 'male',
     country: 'Rwanda',
     city: '',
     tribe: '',
@@ -232,55 +232,33 @@ const SignupFlow: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: signupData.email,
-        password: signupData.password,
-        options: {
-          data: {
-            username: signupData.username,
-            full_name: signupData.full_name
-          }
-        }
+      // Create auth user using new auth system
+      const result = await signUpWithEmail(signupData.email, signupData.password, {
+        id: '', // Will be set by Supabase after user creation
+        username: signupData.username,
+        full_name: signupData.full_name,
+        age: parseInt(signupData.age),
+        gender: signupData.gender,
+        country: signupData.country,
+        city: signupData.city,
+        tribe: signupData.tribe,
+        languages: signupData.languages,
+        interests: signupData.interests,
+        relationship_intention: signupData.relationship_intention,
+        bio: signupData.bio
+        // Note: height, education, drinking, smoking, kids, religion are not in the database schema
+        // These would need to be added as separate columns or stored in a JSON field
       });
 
-      if (authError) throw authError;
+      if (result.success) {
+        toast({
+          title: "Account created successfully!",
+          description: "Welcome to LoveX! Your profile has been set up.",
+        });
 
-      // Create profile record
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            username: signupData.username,
-            full_name: signupData.full_name,
-            age: parseInt(signupData.age),
-            gender: signupData.gender,
-            country: signupData.country,
-            city: signupData.city,
-            tribe: signupData.tribe,
-            languages: signupData.languages,
-            interests: signupData.interests,
-            relationship_intention: signupData.relationship_intention,
-            bio: signupData.bio,
-            height: signupData.height,
-            education: signupData.education,
-            drinking: signupData.drinking,
-            smoking: signupData.smoking,
-            kids: signupData.kids,
-            religion: signupData.religion
-          });
-
-        if (profileError) throw profileError;
+        // Navigate to verification
+        navigate('/verification');
       }
-
-      toast({
-        title: "Account created successfully!",
-        description: "Welcome to LoveX! Your profile has been set up.",
-      });
-
-      // Navigate to verification
-      navigate('/verification');
       
     } catch (error: any) {
       console.error('Signup error:', error);
@@ -475,7 +453,7 @@ const SignupFlow: React.FC = () => {
 
                 <div>
                   <Label htmlFor="gender">Gender</Label>
-                  <Select value={signupData.gender} onValueChange={(value) => setSignupData(prev => ({ ...prev, gender: value }))}>
+                  <Select value={signupData.gender} onValueChange={(value: 'male' | 'female' | 'other') => setSignupData(prev => ({ ...prev, gender: value }))}>
                     <SelectTrigger className={errors.gender ? 'border-red-500' : ''}>
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
@@ -617,7 +595,7 @@ const SignupFlow: React.FC = () => {
 
               <div>
                 <Label htmlFor="relationship_intention">Relationship Intention</Label>
-                <Select value={signupData.relationship_intention} onValueChange={(value) => setSignupData(prev => ({ ...prev, relationship_intention: value }))}>
+                <Select value={signupData.relationship_intention} onValueChange={(value: 'looking_for_love' | 'serious_only' | 'friends_first' | 'sugar_daddy' | 'sugar_mommy') => setSignupData(prev => ({ ...prev, relationship_intention: value }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="What are you looking for?" />
                   </SelectTrigger>
@@ -626,6 +604,8 @@ const SignupFlow: React.FC = () => {
                     <SelectItem value="serious_only">Serious Relationship Only</SelectItem>
                     <SelectItem value="friends_first">Friends First</SelectItem>
                     <SelectItem value="casual_dating">Casual Dating</SelectItem>
+                    <SelectItem value="sugar_daddy">Sugar Daddy</SelectItem>
+                    <SelectItem value="sugar_mommy">Sugar Mommy</SelectItem>
                   </SelectContent>
                 </Select>
                 {errors.relationship_intention && <p className="text-red-500 text-sm">{errors.relationship_intention}</p>}

@@ -51,30 +51,84 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
     try {
       setError(null);
       
-      // Request camera permission
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: 640 },
-          height: { ideal: 480 }
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not supported in this browser');
+      }
+
+      // Try different camera configurations
+      const configs = [
+        {
+          video: {
+            facingMode: 'user',
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          }
+        },
+        {
+          video: {
+            facingMode: 'user'
+          }
+        },
+        {
+          video: true
         }
-      });
+      ];
+
+      let mediaStream: MediaStream | null = null;
+      let lastError: Error | null = null;
+
+      // Try each configuration
+      for (const config of configs) {
+        try {
+          console.log('Trying camera config:', config);
+          mediaStream = await navigator.mediaDevices.getUserMedia(config);
+          break; // Success, exit the loop
+        } catch (err) {
+          console.warn('Camera config failed:', config, err);
+          lastError = err as Error;
+          continue;
+        }
+      }
+
+      if (!mediaStream) {
+        throw lastError || new Error('Failed to access camera');
+      }
 
       setStream(mediaStream);
       setHasPermission(true);
 
       // Get available devices
-      const deviceList = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = deviceList.filter(device => device.kind === 'videoinput');
-      setDevices(videoDevices);
-      
-      if (videoDevices.length > 0) {
-        setCurrentDeviceId(videoDevices[0].deviceId);
+      try {
+        const deviceList = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = deviceList.filter(device => device.kind === 'videoinput');
+        setDevices(videoDevices);
+        
+        if (videoDevices.length > 0) {
+          setCurrentDeviceId(videoDevices[0].deviceId);
+        }
+      } catch (deviceErr) {
+        console.warn('Failed to enumerate devices:', deviceErr);
       }
 
-    } catch (err) {
+      console.log('Camera started successfully');
+
+    } catch (err: any) {
       console.error('Camera access failed:', err);
-      setError('Camera access denied. Please allow camera access to continue.');
+      
+      let userMessage = 'Camera access failed. Please allow camera access to continue.';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        userMessage = 'Camera access was denied. Please allow camera access in your browser settings and refresh the page.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        userMessage = 'No camera device found. Please connect a camera and try again.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        userMessage = 'Camera is already in use by another application. Please close other apps using the camera and try again.';
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        userMessage = 'Camera does not support the required settings. Try using a different camera.';
+      }
+      
+      setError(userMessage);
       setHasPermission(false);
     }
   }, []);

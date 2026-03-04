@@ -130,8 +130,20 @@ export function useAuth() {
     await supabase.auth.signOut();
   };
 
+  const updateUser = async (updates: any) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser(updates);
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error;
+    }
+  };
+
   return {
     ...authState,
-    signOut
+    signOut,
+    updateUser
   };
 }

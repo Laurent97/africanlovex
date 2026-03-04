@@ -162,7 +162,7 @@ const Dashboard = () => {
       .from('profiles')
       .select('*')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (profile) {
       setUserProfile(profile);
@@ -657,20 +657,10 @@ const Dashboard = () => {
         </AnimatePresence>
 
         {/* Header */}
-        <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-rose-200 dark:border-rose-900/30">
+        <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                {/* Mobile Menu Button */}
-                <Button
-                  onClick={() => setMobileMenuOpen(true)}
-                  variant="ghost"
-                  size="sm"
-                  className="lg:hidden text-gray-700 dark:text-gray-300"
-                >
-                  <Menu className="w-6 h-6" />
-                </Button>
-
                 <motion.div
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
@@ -680,7 +670,7 @@ const Dashboard = () => {
                     Dashboard
                   </h1>
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    Welcome back, {userProfile?.full_name || user.email?.split('@')[0] || 'User'}!
+                    Welcome back, {userProfile?.full_name || user?.email?.split('@')[0] || 'User'}!
                   </p>
                 </motion.div>
               </div>

@@ -81,21 +81,102 @@ const Auth = () => {
 
           {/* Auth Forms */}
           <div className="flex justify-center">
-            <Tabs defaultValue="phone" className="w-full max-w-md">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+            <Tabs defaultValue="login" className="w-full max-w-md">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
                 <TabsTrigger value="phone">Phone</TabsTrigger>
-                <TabsTrigger value="email">Email</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="login" className="mt-0">
+                <div className="space-y-4">
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-semibold">Welcome Back!</h3>
+                    <p className="text-sm text-muted-foreground">Sign in to continue your journey</p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Button 
+                      onClick={() => navigate('/auth/login')}
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    >
+                      Email Login
+                    </Button>
+                    
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Or</span>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={() => navigate('/auth/register')}
+                      className="w-full"
+                    >
+                      Create New Account
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="signup" className="mt-0">
+                <div className="space-y-4">
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-semibold">Join LoveX</h3>
+                    <p className="text-sm text-muted-foreground">Start your journey to find love</p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Button 
+                      onClick={() => navigate('/auth/register')}
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    >
+                      🎉 Modern Sign Up
+                      <span className="text-xs ml-2">6-step guided process</span>
+                    </Button>
+                    
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Or</span>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={() => window.location.href = '/auth/login'}
+                      className="w-full"
+                    >
+                      Already have an account? Sign In
+                    </Button>
+                  </div>
+                  
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mt-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">✨</span>
+                      <div>
+                        <h4 className="font-semibold text-purple-900 mb-1">Modern Sign Up Features</h4>
+                        <ul className="text-sm text-purple-800 space-y-1">
+                          <li>• Progressive 6-step onboarding</li>
+                          <li>• Photo upload with preview</li>
+                          <li>• Interest matching system</li>
+                          <li>• East African focused options</li>
+                          <li>• Progress saved automatically</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
 
               <TabsContent value="phone" className="mt-0">
                 <PhoneAuth 
-                  onSuccess={handleAuthSuccess}
-                  onError={handleAuthError}
-                />
-              </TabsContent>
-
-              <TabsContent value="email" className="mt-0">
-                <EmailAuth 
                   onSuccess={handleAuthSuccess}
                   onError={handleAuthError}
                 />

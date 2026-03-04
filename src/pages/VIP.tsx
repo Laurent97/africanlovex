@@ -60,7 +60,8 @@ import {
   Plane,
   Home,
   Gem,
-  Award as AwardIcon
+  Award as AwardIcon,
+  Coins
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,6 +86,9 @@ import { AuthGuard } from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/use-subscription';
+import { paymentsApi } from '@/api/payments';
+import { supabase } from '@/lib/supabase';
+import { MobileMoneyPayment } from '@/components/payment/MobileMoneyPayment';
 
 interface Plan {
   id: string;
@@ -92,6 +96,8 @@ interface Plan {
   tier: 'basic' | 'love' | 'premium' | 'platinum' | 'diamond';
   price: number;
   yearlyPrice: number;
+  coinPrice: number; // Price in coins for wallet system
+  yearlyCoinPrice: number; // Yearly price in coins
   period: string;
   currency: string;
   features: {
@@ -128,12 +134,17 @@ const VIP = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [showComparison, setShowComparison] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('card');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('wallet');
   const [isProcessing, setIsProcessing] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [activeTab, setActiveTab] = useState('plans');
+  const [userBalance, setUserBalance] = useState(0);
+  const [showMobileMoneyPayment, setShowMobileMoneyPayment] = useState(false);
+  const [coinsNeeded, setCoinsNeeded] = useState(0);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [selectedNetwork, setSelectedNetwork] = useState('');
 
   const plans: Plan[] = [
     {
@@ -142,6 +153,8 @@ const VIP = () => {
       tier: 'basic',
       price: 0,
       yearlyPrice: 0,
+      coinPrice: 0,
+      yearlyCoinPrice: 0,
       period: 'month',
       currency: 'USD',
       features: [
@@ -166,6 +179,8 @@ const VIP = () => {
       tier: 'love',
       price: 4.99,
       yearlyPrice: 47.99,
+      coinPrice: 500,
+      yearlyCoinPrice: 4500,
       period: 'month',
       currency: 'USD',
       popular: true,
@@ -194,6 +209,8 @@ const VIP = () => {
       tier: 'premium',
       price: 9.99,
       yearlyPrice: 95.99,
+      coinPrice: 1000,
+      yearlyCoinPrice: 9000,
       period: 'month',
       currency: 'USD',
       features: [
@@ -223,6 +240,8 @@ const VIP = () => {
       tier: 'platinum',
       price: 19.99,
       yearlyPrice: 191.99,
+      coinPrice: 2000,
+      yearlyCoinPrice: 18000,
       period: 'month',
       currency: 'USD',
       features: [
@@ -255,6 +274,8 @@ const VIP = () => {
       tier: 'diamond',
       price: 49.99,
       yearlyPrice: 479.99,
+      coinPrice: 5000,
+      yearlyCoinPrice: 45000,
       period: 'month',
       currency: 'USD',
       features: [
@@ -333,12 +354,35 @@ const VIP = () => {
   ];
 
   const paymentMethods = [
+    { id: 'wallet', name: 'Wallet Coins', icon: <Coins className="w-5 h-5" />, description: 'Pay with your LoveX coins' },
     { id: 'card', name: 'Credit Card', icon: <CreditCard className="w-5 h-5" />, description: 'Visa, Mastercard, Amex' },
     { id: 'mtn', name: 'MTN MoMo', icon: <Smartphone className="w-5 h-5" />, description: 'Mobile Money' },
     { id: 'airtel', name: 'Airtel Money', icon: <Smartphone className="w-5 h-5" />, description: 'Airtel Mobile Money' },
     { id: 'mpesa', name: 'M-Pesa', icon: <Smartphone className="w-5 h-5" />, description: 'Safaricom M-Pesa' },
     { id: 'crypto', name: 'Cryptocurrency', icon: <Wallet className="w-5 h-5" />, description: 'BTC, ETH, USDT' }
   ];
+
+  // Load user balance on mount
+  useEffect(() => {
+    if (user) {
+      loadUserBalance();
+    }
+  }, [user]);
+
+  const loadUserBalance = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('coins_balance')
+        .eq('id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setUserBalance(data.coins_balance || 0);
+    } catch (error) {
+      console.error('Error loading balance:', error);
+    }
+  };
 
   const getYearlyPrice = (monthlyPrice: number) => {
     return Math.round(monthlyPrice * 12 * 0.8 * 100) / 100; // 20% discount
@@ -353,40 +397,202 @@ const VIP = () => {
     setIsProcessing(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const finalPrice = getDisplayPrice(plans.find(p => p.id === selectedPlan)!);
-      
-      await updateSubscription({
-        planId: selectedPlan,
-        billingCycle,
-        price: finalPrice,
-        paymentMethod: selectedPaymentMethod
+      const currentPlan = plans.find(p => p.id === selectedPlan);
+      if (!currentPlan) {
+        throw new Error('Invalid plan selected');
+      }
+
+      const finalPrice = getDisplayPrice(currentPlan);
+      const coinPrice = billingCycle === 'yearly' ? currentPlan.yearlyCoinPrice : currentPlan.coinPrice;
+
+      if (selectedPaymentMethod === 'wallet') {
+        // Handle wallet payment
+        if (userBalance < coinPrice) {
+          toast({
+            title: "Insufficient Coins",
+            description: `You need ${coinPrice} coins for this plan. You have ${userBalance} coins.`,
+            variant: "destructive",
+          });
+          setIsProcessing(false);
+          return;
+        }
+
+        // Deduct coins from user balance
+        const { error: balanceError } = await supabase
+          .from('profiles')
+          .update({ coins_balance: userBalance - coinPrice })
+          .eq('id', user?.id);
+
+        if (balanceError) throw balanceError;
+
+        // Record coin transaction
+        const { error: transactionError } = await supabase
+          .from('coin_transactions')
+          .insert({
+            user_id: user?.id,
+            amount: -coinPrice,
+            transaction_type: 'subscription',
+            description: `${currentPlan.name} Plan Subscription - ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}`,
+            reference_id: currentPlan.id
+          });
+
+        if (transactionError) throw transactionError;
+
+        // Update subscription
+        await updateSubscription({
+          planId: currentPlan.id,
+          billingCycle,
+          price: 0, // Free since paid with coins
+          paymentMethod: 'wallet',
+          coinPrice: coinPrice
+        });
+
+        // Update local balance
+        setUserBalance(prev => prev - coinPrice);
+
+        toast({
+          title: "Subscription Activated! 🎉",
+          description: `You are now on the ${currentPlan.name} plan. ${coinPrice} coins have been deducted from your wallet.`,
+          variant: "default",
+        });
+
+        setShowPaymentModal(false);
+        
+        // Redirect to profile after successful subscription
+        setTimeout(() => {
+          navigate('/profile');
+        }, 2000);
+
+      } else if (selectedPaymentMethod === 'mtn' || selectedPaymentMethod === 'airtel' || selectedPaymentMethod === 'mpesa') {
+        // Handle mobile money payment
+        const coinsNeeded = coinPrice;
+        setCoinsNeeded(coinsNeeded);
+        setShowPaymentModal(false);
+        setShowMobileMoneyPayment(true);
+        setIsProcessing(false);
+        return;
+      } else {
+        // Handle external payment methods
+        const paymentData = {
+          amount: finalPrice,
+          currency: 'USD',
+          email: user?.email || '',
+          fullname: user?.user_metadata?.full_name || user?.email || '',
+          tx_ref: `vip_${currentPlan.id}_${Date.now()}`,
+          payment_method: selectedPaymentMethod,
+          meta: {
+            planId: currentPlan.id,
+            billingCycle,
+            coinPrice: coinPrice
+          }
+        };
+
+        const result = await paymentsApi.initiatePayment(paymentData);
+        
+        if (result.status === 'success') {
+          // Redirect to payment page
+          if (result.data?.payment_link) {
+            window.location.href = result.data.payment_link;
+          } else {
+            throw new Error('Payment link not generated');
+          }
+        } else {
+          throw new Error(result.message || 'Payment initiation failed');
+        }
+
+        setShowPaymentModal(false);
+        
+        // Redirect to profile after successful subscription
+        setTimeout(() => {
+          navigate('/profile');
+        }, 2000);
+      }
+
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      toast({
+        title: "Payment Failed",
+        description: error.message || "There was an error processing your payment. Please try again.",
+        variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleMobileMoneySuccess = async (transaction: any) => {
+    try {
+      const currentPlan = plans.find(p => p.id === selectedPlan);
+      if (!currentPlan) return;
+
+      // Credit user coins after successful mobile money payment
+      const coinsToCredit = billingCycle === 'yearly' ? currentPlan.yearlyCoinPrice : currentPlan.coinPrice;
+      
+      // Update user balance
+      const { error: balanceError } = await supabase
+        .from('profiles')
+        .update({ coins_balance: userBalance + coinsToCredit })
+        .eq('id', user?.id);
+
+      if (balanceError) throw balanceError;
+
+      // Record transaction
+      const { error: transactionError } = await supabase
+        .from('coin_transactions')
+        .insert({
+          user_id: user?.id,
+          amount: coinsToCredit,
+          transaction_type: 'purchase',
+          description: `Mobile Money Payment - ${currentPlan.name} Plan`,
+          reference_id: transaction.transaction_id
+        });
+
+      if (transactionError) throw transactionError;
+
+      // Now process the subscription with wallet
+      await updateSubscription({
+        planId: currentPlan.id,
+        billingCycle,
+        price: 0,
+        paymentMethod: 'wallet',
+        coinPrice: coinsToCredit
+      });
+
+      // Update local balance
+      setUserBalance(prev => prev + coinsToCredit);
 
       toast({
         title: "Subscription Activated! 🎉",
-        description: `You are now on the ${plans.find(p => p.id === selectedPlan)?.name} plan.`,
+        description: `You are now on the ${currentPlan.name} plan.`,
         variant: "default",
       });
 
-      setShowPaymentModal(false);
+      setShowMobileMoneyPayment(false);
+      setCoinsNeeded(0);
       
       // Redirect to profile after successful subscription
       setTimeout(() => {
         navigate('/profile');
       }, 2000);
 
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Mobile money success error:', error);
       toast({
-        title: "Subscription Failed",
-        description: "There was an error processing your payment. Please try again.",
+        title: "Error Processing Subscription",
+        description: error.message,
         variant: "destructive",
       });
-    } finally {
-      setIsProcessing(false);
     }
+  };
+
+  const handleMobileMoneyError = (error: string) => {
+    toast({
+      title: "Payment Failed",
+      description: error,
+      variant: "destructive",
+    });
+    setShowMobileMoneyPayment(false);
+    setCoinsNeeded(0);
   };
 
   const handlePromoCode = () => {
@@ -409,12 +615,14 @@ const VIP = () => {
 
   const getDisplayPrice = (plan: Plan) => {
     let price = billingCycle === 'yearly' ? plan.yearlyPrice : plan.price;
+    let coinPrice = billingCycle === 'yearly' ? plan.yearlyCoinPrice : plan.coinPrice;
     
     if (promoApplied) {
       price = price * (1 - promoDiscount / 100);
+      coinPrice = coinPrice * (1 - promoDiscount / 100);
     }
     
-    return Math.round(price * 100) / 100;
+    return selectedPaymentMethod === 'wallet' ? Math.round(coinPrice) : Math.round(price * 100) / 100;
   };
 
   const getPeriodDisplay = () => {
@@ -616,8 +824,13 @@ const VIP = () => {
 
                     <CardHeader className="text-center pt-12 pb-4">
                       {/* Plan Icon */}
-                      <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center text-white shadow-lg"
-                           style={{ background: plan.gradient }}>
+                      <div className={`w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center text-white shadow-lg bg-gradient-to-r ${
+                        plan.id === 'basic' ? 'from-gray-400 to-gray-600' :
+                        plan.id === 'love' ? 'from-pink-500 to-purple-600' :
+                        plan.id === 'premium' ? 'from-purple-600 to-pink-600' :
+                        plan.id === 'platinum' ? 'from-cyan-500 to-blue-600' :
+                        'from-amber-500 to-orange-600'
+                      }`}>
                         {plan.icon}
                       </div>
 
@@ -630,6 +843,20 @@ const VIP = () => {
                       <div className="text-center">
                         {plan.price === 0 ? (
                           <div className="text-3xl font-bold text-green-600">Free</div>
+                        ) : selectedPaymentMethod === 'wallet' ? (
+                          <div>
+                            <div className="text-4xl font-bold" style={{ color: plan.color }}>
+                              {getDisplayPrice(plan)} coins
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">
+                              per {getPeriodDisplay()}
+                            </div>
+                            {billingCycle === 'yearly' && (
+                              <div className="text-xs text-green-600 font-medium mt-1">
+                                {Math.round(plan.coinPrice * 100) / 100}/month
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <div>
                             <div className="text-4xl font-bold" style={{ color: plan.color }}>
@@ -903,8 +1130,13 @@ const VIP = () => {
                   <div className="mb-6">
                     <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg">
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center text-white"
-                             style={{ background: plans.find(p => p.id === selectedPlan)?.gradient }}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg bg-gradient-to-r ${
+                          selectedPlan === 'basic' ? 'from-gray-400 to-gray-600' :
+                          selectedPlan === 'love' ? 'from-pink-500 to-purple-600' :
+                          selectedPlan === 'premium' ? 'from-purple-600 to-pink-600' :
+                          selectedPlan === 'platinum' ? 'from-cyan-500 to-blue-600' :
+                          'from-amber-500 to-orange-600'
+                        }`}>
                           {plans.find(p => p.id === selectedPlan)?.icon}
                         </div>
                         <div>
@@ -920,8 +1152,16 @@ const VIP = () => {
                         <span className="text-gray-600">Total:</span>
                         <div className="text-right">
                           <div className="text-2xl font-bold text-gray-900">
-                            ${getDisplayPrice(plans.find(p => p.id === selectedPlan)!)}
+                            {selectedPaymentMethod === 'wallet' 
+                              ? `${getDisplayPrice(plans.find(p => p.id === selectedPlan)!)} coins`
+                              : `$${getDisplayPrice(plans.find(p => p.id === selectedPlan)!)}`
+                            }
                           </div>
+                          {selectedPaymentMethod === 'wallet' && (
+                            <div className="text-sm text-gray-500 mt-1">
+                              Your balance: {userBalance} coins
+                            </div>
+                          )}
                           {promoApplied && (
                             <div className="text-xs text-green-600">
                               {promoDiscount}% discount applied
@@ -992,6 +1232,41 @@ const VIP = () => {
                   By confirming, you agree to our Terms of Service and Privacy Policy.
                   Your subscription will automatically renew unless canceled.
                 </p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Mobile Money Payment Modal */}
+        <AnimatePresence>
+          {showMobileMoneyPayment && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+              onClick={() => {
+                setShowMobileMoneyPayment(false);
+                setCoinsNeeded(0);
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="w-full max-w-md mx-4"
+                onClick={e => e.stopPropagation()}
+              >
+                <MobileMoneyPayment
+                  amount={Math.ceil(coinsNeeded / 10)} // Convert coins to currency (10 coins = 1 RWF)
+                  currency="RWF"
+                  onSuccess={handleMobileMoneySuccess}
+                  onError={handleMobileMoneyError}
+                  onClose={() => {
+                    setShowMobileMoneyPayment(false);
+                    setCoinsNeeded(0);
+                  }}
+                />
               </motion.div>
             </motion.div>
           )}

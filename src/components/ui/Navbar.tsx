@@ -13,7 +13,8 @@ import {
   Crown,
   Wallet,
   Radio,
-  ChevronDown
+  ChevronDown,
+  LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,9 +22,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/hooks/use-auth';
 
 const Navbar = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      // Navigation will be handled by the auth state change
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const navigationItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
@@ -198,12 +208,11 @@ const Navbar = () => {
                           variant="outline"
                           className="w-full justify-start"
                           onClick={() => {
-                            // Handle logout
-                            console.log('Logout');
+                            handleLogout();
                             setIsMobileMenuOpen(false);
                           }}
                         >
-                          <X className="w-4 h-4 mr-3" />
+                          <LogOut className="w-4 h-4 mr-3" />
                           <span>Sign Out</span>
                         </Button>
                       </div>

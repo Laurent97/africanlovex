@@ -1279,55 +1279,6 @@ const Live = () => {
               </div>
 
               <div className="flex items-center gap-2 ml-auto">
-                {/* Mobile Menu */}
-                <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="sm" className="lg:hidden text-white hover:bg-white/20">
-                      <Menu className="w-5 h-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="bg-gray-900 text-white border-gray-800 w-64">
-                    <SheetHeader>
-                      <SheetTitle className="text-white">Stream Info</SheetTitle>
-                    </SheetHeader>
-                    <div className="mt-4 space-y-4">
-                      <div>
-                        <h4 className="text-sm text-gray-400 mb-2">Host</h4>
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-8 h-8">
-                            <AvatarImage src={selectedStream.host_avatar} />
-                            <AvatarFallback>{selectedStream.host_name[0]}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{selectedStream.host_name}</p>
-                            <p className="text-xs text-gray-400">{selectedStream.city}, {selectedStream.country}</p>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="text-sm text-gray-400 mb-2">About</h4>
-                        <p className="text-sm">{selectedStream.bio || 'No bio yet'}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm text-gray-400 mb-2">Tags</h4>
-                        <div className="flex flex-wrap gap-1">
-                          {selectedStream.tags?.map(tag => (
-                            <Badge key={tag} className="bg-white/10 text-white">#{tag}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => setShowParticipants(!showParticipants)}
-                        variant="outline"
-                        className="w-full border-white/20 text-white hover:bg-white/10"
-                      >
-                        <Users className="w-4 h-4 mr-2" />
-                        Viewers ({viewerCount})
-                      </Button>
-                    </div>
-                  </SheetContent>
-                </Sheet>
-
                 {/* Room Type */}
                 <div className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm text-white">
                   {getRoomTypeIcon(selectedStream.room_type)}

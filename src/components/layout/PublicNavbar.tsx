@@ -13,6 +13,12 @@ export const PublicNavbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
+  const handleNavigation = (path: string) => {
+    console.log('Navigating to:', path);
+    setIsMobileMenuOpen(false);
+    navigate(path);
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 pt-safe">
       <div className="container mx-auto px-4">
@@ -27,25 +33,25 @@ export const PublicNavbar = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            <Button variant="ghost" onClick={() => navigate('/')}>
+            <Button variant="ghost" onClick={() => handleNavigation('/')}>
               Home
             </Button>
-            <Button variant="ghost" onClick={() => navigate('/about')}>
+            <Button variant="ghost" onClick={() => handleNavigation('/about')}>
               About
             </Button>
-            <Button variant="ghost" onClick={() => navigate('/success-stories')}>
+            <Button variant="ghost" onClick={() => handleNavigation('/success-stories')}>
               Success Stories
             </Button>
           </nav>
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="outline" onClick={() => navigate('/auth/login')}>
+            <Button variant="outline" onClick={() => handleNavigation('/auth/login')}>
               Sign In
             </Button>
             <Button 
               className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              onClick={() => navigate('/auth/register')}
+              onClick={() => handleNavigation('/auth/register')}
             >
               Sign Up
             </Button>
@@ -66,22 +72,22 @@ export const PublicNavbar = () => {
         {isMobileMenuOpen && (
           <div className="md:hidden py-4 border-t">
             <nav className="flex flex-col gap-4">
-              <Button variant="ghost" onClick={() => navigate('/')} className="justify-start">
+              <Button variant="ghost" onClick={() => handleNavigation('/')} className="justify-start">
                 Home
               </Button>
-              <Button variant="ghost" onClick={() => navigate('/about')} className="justify-start">
+              <Button variant="ghost" onClick={() => handleNavigation('/about')} className="justify-start">
                 About
               </Button>
-              <Button variant="ghost" onClick={() => navigate('/success-stories')} className="justify-start">
+              <Button variant="ghost" onClick={() => handleNavigation('/success-stories')} className="justify-start">
                 Success Stories
               </Button>
               <div className="flex flex-col gap-3 pt-4 border-t">
-                <Button variant="outline" onClick={() => navigate('/auth/login')}>
+                <Button variant="outline" onClick={() => handleNavigation('/auth/login')}>
                   Sign In
                 </Button>
                 <Button 
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                  onClick={() => navigate('/auth/register')}
+                  onClick={() => handleNavigation('/auth/register')}
                 >
                   Sign Up
                 </Button>

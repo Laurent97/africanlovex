@@ -1,0 +1,1147 @@
+import React, { useState, useCallback, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ArrowRight, 
+  ArrowLeft, 
+  Camera, 
+  Upload, 
+  User, 
+  Globe, 
+  Heart, 
+  Briefcase,
+  Music,
+  Sparkles,
+  Check,
+  X,
+  Loader2,
+  MapPin,
+  Calendar,
+  Shield,
+  Star
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { signUpWithEmail } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
+
+interface SignupData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  username: string;
+  fullName: string;
+  birthDate: string;
+  gender: 'male' | 'female' | 'non_binary' | 'other';
+  showGender: boolean;
+  country: string;
+  city: string;
+  tribe: string;
+  languages: string[];
+  photos: string[];
+  bio: string;
+  interests: string[];
+  relationshipIntention: 'looking_for_love' | 'serious_only' | 'friends_first' | 'sugar_daddy' | 'sugar_mommy';
+  height: string;
+  education: string;
+  occupation: string;
+  drinking: 'never' | 'socially' | 'regularly';
+  smoking: 'never' | 'socially' | 'regularly';
+  kids: 'dont_want' | 'want_someday' | 'have_kids' | 'open_to_kids';
+  religion: string;
+  instagram?: string;
+  spotify?: string;
+}
+
+const SimpleSignupFlow: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  
+  const [signupData, setSignupData] = useState<Partial<SignupData>>({
+    gender: 'male',
+    showGender: true,
+    country: 'Rwanda',
+    languages: [],
+    interests: [],
+    photos: [],
+    relationshipIntention: 'looking_for_love'
+  });
+
+  const totalSteps = 6;
+  const progress = (currentStep / totalSteps) * 100;
+
+  // Save progress to localStorage
+  useEffect(() => {
+    if (signupData) {
+      localStorage.setItem('lovex_signup_progress', JSON.stringify(signupData));
+    }
+  }, [signupData, currentStep]);
+
+  // Load saved progress on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('lovex_signup_progress');
+    if (saved) {
+      const data = JSON.parse(saved);
+      setSignupData(data);
+      const savedStep = 1; // Could be enhanced to track step
+      setCurrentStep(Math.min(savedStep, totalSteps));
+    }
+  }, []);
+
+  // Constants
+  const countries = [
+    'Rwanda', 'Kenya', 'Uganda', 'Tanzania', 'Burundi', 'South Sudan',
+    'Ethiopia', 'Eritrea', 'Somalia', 'Djibouti', 'Sudan', 'Egypt',
+    'Libya', 'Tunisia', 'Algeria', 'Morocco', 'Nigeria', 'Cameroon',
+    'Chad', 'Niger', 'Mali', 'Burkina Faso', 'Senegal', 'Gambia',
+    'Guinea', 'Guinea-Bissau', 'Sierra Leone', 'Liberia', 'Ivory Coast',
+    'Ghana', 'Togo', 'Benin', 'Equatorial Guinea', 'Gabon',
+    'Congo', 'DRC', 'Angola', 'Zambia', 'Malawi', 'Mozambique',
+    'Zimbabwe', 'Botswana', 'Namibia', 'South Africa', 'Eswatini',
+    'Lesotho', 'Madagascar', 'Mauritius', 'Seychelles', 'Comoros'
+  ];
+
+  const tribes = [
+    'Tutsi', 'Hutu', 'Twa', 'Kikuyu', 'Luo', 'Kalenjin', 'Luhya',
+    'Kamba', 'Meru', 'Embu', 'Mbeere', 'Taita', 'Pare', 'Chaga',
+    'Iraqw', 'Gorowa', 'Rangi', 'Chagga', 'Sambaa', 'Digo', 'Bondei',
+    'Zanaki', 'Makonde', 'Yao', 'Ngoni', 'Tumbuka', 'Chewa', 'Nyanja',
+    'Lomwe', 'Sen', 'Khoe', 'San', 'Ovambo', 'Herero', 'Nama', 'Damara',
+    'Lozi', 'Tonga', 'Ila', 'Lunda', 'Luba', 'Kongo'
+  ];
+
+  const languages = [
+    'English', 'French', 'Spanish', 'German', 'Italian', 'Portuguese',
+    'Russian', 'Chinese', 'Japanese', 'Korean', 'Arabic', 'Hindi',
+    'Swahili', 'Kinyarwanda', 'Luganda', 'Lingala', 'Zulu', 'Yoruba'
+  ];
+
+  const interests = [
+    { name: 'Travel', icon: '✈️', category: 'lifestyle' },
+    { name: 'Music', icon: '🎵', category: 'arts' },
+    { name: 'Coffee', icon: '☕', category: 'lifestyle' },
+    { name: 'Reading', icon: '📚', category: 'intellectual' },
+    { name: 'Cooking', icon: '🍳', category: 'lifestyle' },
+    { name: 'Photography', icon: '📸', category: 'arts' },
+    { name: 'Art', icon: '🎨', category: 'arts' },
+    { name: 'Dancing', icon: '💃', category: 'arts' },
+    { name: 'Movies', icon: '🎬', category: 'entertainment' },
+    { name: 'Sports', icon: '⚽', category: 'fitness' },
+    { name: 'Fitness', icon: '💪', category: 'fitness' },
+    { name: 'Nature', icon: '🌿', category: 'outdoor' },
+    { name: 'Technology', icon: '💻', category: 'intellectual' },
+    { name: 'Gaming', icon: '🎮', category: 'entertainment' },
+    { name: 'Fashion', icon: '👗', category: 'lifestyle' },
+    { name: 'Food', icon: '🍕', category: 'lifestyle' },
+    { name: 'Wine', icon: '🍷', category: 'lifestyle' },
+    { name: 'Animals', icon: '🐾', category: 'lifestyle' },
+    { name: 'Volunteering', icon: '🤝', category: 'social' },
+    { name: 'Spirituality', icon: '🧘', category: 'lifestyle' },
+    { name: 'Business', icon: '💼', category: 'career' },
+    { name: 'Science', icon: '🔬', category: 'intellectual' },
+    { name: 'History', icon: '📜', category: 'intellectual' }
+  ];
+
+  // Simple validation
+  const validateStep = (step: number): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    switch (step) {
+      case 1:
+        if (!signupData.email) newErrors.email = 'Email is required';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupData.email)) {
+          newErrors.email = 'Please enter a valid email';
+        }
+        
+        if (!signupData.password) newErrors.password = 'Password is required';
+        else if (signupData.password.length < 8) {
+          newErrors.password = 'Password must be at least 8 characters';
+        }
+        
+        if (!signupData.confirmPassword) {
+          newErrors.confirmPassword = 'Please confirm your password';
+        } else if (signupData.password !== signupData.confirmPassword) {
+          newErrors.confirmPassword = 'Passwords do not match';
+        }
+        
+        if (!signupData.username) newErrors.username = 'Username is required';
+        else if (signupData.username.length < 3) {
+          newErrors.username = 'Username must be at least 3 characters';
+        }
+        
+        if (!signupData.fullName) newErrors.fullName = 'Full name is required';
+        else if (signupData.fullName.length < 2) {
+          newErrors.fullName = 'Full name must be at least 2 characters';
+        }
+        
+        if (!signupData.birthDate) newErrors.birthDate = 'Birth date is required';
+        else {
+          const birthDate = new Date(signupData.birthDate);
+          const today = new Date();
+          const age = today.getFullYear() - birthDate.getFullYear();
+          if (age < 18 || age > 100) {
+            newErrors.birthDate = 'You must be between 18 and 100 years old';
+          }
+        }
+        
+        if (!signupData.gender) newErrors.gender = 'Gender is required';
+        break;
+        
+      case 2:
+        if (!signupData.country) newErrors.country = 'Country is required';
+        if (!signupData.city) newErrors.city = 'City is required';
+        if (!signupData.tribe) newErrors.tribe = 'Tribe is required';
+        if (!signupData.languages || signupData.languages.length === 0) newErrors.languages = 'Select at least one language';
+        break;
+        
+      case 3:
+        if (!signupData.photos || signupData.photos.length === 0) newErrors.photos = 'Please upload at least one photo';
+        break;
+        
+      case 4:
+        if (!signupData.bio) newErrors.bio = 'Bio is required';
+        else if (signupData.bio.length < 50) {
+          newErrors.bio = 'Bio must be at least 50 characters';
+        } else if (signupData.bio.length > 500) {
+          newErrors.bio = 'Bio must be less than 500 characters';
+        }
+        
+        if (!signupData.interests || signupData.interests.length < 3) {
+          newErrors.interests = 'Select at least 3 interests';
+        }
+        
+        if (!signupData.relationshipIntention) {
+          newErrors.relationshipIntention = 'Relationship intention is required';
+        }
+        break;
+        
+      case 5:
+        if (!signupData.height) newErrors.height = 'Height is required';
+        if (!signupData.education) newErrors.education = 'Education is required';
+        if (!signupData.occupation) newErrors.occupation = 'Occupation is required';
+        if (!signupData.drinking) newErrors.drinking = 'Drinking preference is required';
+        if (!signupData.smoking) newErrors.smoking = 'Smoking preference is required';
+        if (!signupData.kids) newErrors.kids = 'Kids preference is required';
+        if (!signupData.religion) newErrors.religion = 'Religion is required';
+        break;
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Check username availability
+  const checkUsername = useCallback(async (username: string) => {
+    if (username.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+
+    setIsCheckingUsername(true);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('username', username)
+        .single();
+      
+      setUsernameAvailable(!data);
+    } catch (error) {
+      setUsernameAvailable(null);
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  }, []);
+
+  // Photo upload
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const file = files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image under 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+    
+    setSignupData(prev => ({
+      ...prev,
+      photos: [...(prev.photos || []), previewUrl]
+    }));
+    
+    toast({
+      title: "Photo uploaded",
+      description: "Your photo has been added successfully",
+    });
+  };
+
+  const removePhoto = (index: number) => {
+    setSignupData(prev => ({
+      ...prev,
+      photos: prev.photos?.filter((_, i) => i !== index) || []
+    }));
+  };
+
+  const handleNext = () => {
+    if (!validateStep(currentStep)) return;
+    
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    
+    try {
+      // Calculate age from birth date
+      const birthDate = new Date(signupData.birthDate!);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+
+      const result = await signUpWithEmail(signupData.email!, signupData.password!, {
+        id: '', // Will be set by Supabase
+        username: signupData.username!,
+        full_name: signupData.fullName!,
+        birth_date: signupData.birthDate,
+        age: age,
+        gender: signupData.gender!,
+        show_gender: signupData.showGender!,
+        country: signupData.country!,
+        city: signupData.city!,
+        tribe: signupData.tribe!,
+        languages: signupData.languages!,
+        avatar_url: signupData.photos?.[0],
+        bio: signupData.bio!,
+        interests: signupData.interests!,
+        relationship_intention: signupData.relationshipIntention!,
+        height: parseInt(signupData.height!),
+        education: signupData.education!,
+        occupation: signupData.occupation!,
+        drinking: signupData.drinking!,
+        smoking: signupData.smoking!,
+        kids: signupData.kids!,
+        religion: signupData.religion!,
+        instagram: signupData.instagram,
+        spotify: signupData.spotify,
+        onboarding_completed: true,
+        onboarding_step: totalSteps
+      });
+
+      if (result.success) {
+        // Clear saved progress
+        localStorage.removeItem('lovex_signup_progress');
+        
+        toast({
+          title: "Welcome to LoveX! 🎉",
+          description: "Your profile has been created successfully.",
+        });
+
+        navigate('/verification');
+      }
+      
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      toast({
+        title: "Signup failed",
+        description: error.message || "An error occurred during signup. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stepVariants = {
+    enter: { x: 300, opacity: 0 },
+    center: { x: 0, opacity: 1 },
+    exit: { x: -300, opacity: 0 }
+  };
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <motion.div
+            key="step1"
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <User className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Let's Get Started</h2>
+              <p className="text-gray-600">Create your account to find your perfect match</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    placeholder="Enter your full name"
+                    value={signupData.fullName || ''}
+                    onChange={(e) => setSignupData(prev => ({ ...prev, fullName: e.target.value }))}
+                    className={errors.fullName ? 'border-red-500' : ''}
+                  />
+                  {errors.fullName && <p className="text-red-500 text-sm">{errors.fullName}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="username">Username</Label>
+                  <div className="relative">
+                    <Input
+                      id="username"
+                      placeholder="Choose a username"
+                      value={signupData.username || ''}
+                      onChange={(e) => {
+                        setSignupData(prev => ({ ...prev, username: e.target.value }));
+                        checkUsername(e.target.value);
+                      }}
+                      className={errors.username ? 'border-red-500' : ''}
+                    />
+                    {isCheckingUsername && (
+                      <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+                    )}
+                    {usernameAvailable === true && (
+                      <Check className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-500" />
+                    )}
+                    {usernameAvailable === false && (
+                      <X className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-red-500" />
+                    )}
+                  </div>
+                  {errors.username && <p className="text-red-500 text-sm">{errors.username}</p>}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="your.email@example.com"
+                  value={signupData.email || ''}
+                  onChange={(e) => setSignupData(prev => ({ ...prev, email: e.target.value }))}
+                  className={errors.email ? 'border-red-500' : ''}
+                />
+                {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Create a strong password"
+                      value={signupData.password || ''}
+                      onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
+                      className={errors.password ? 'border-red-500' : ''}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <X className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-red-500 text-sm">{errors.password}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Confirm your password"
+                    value={signupData.confirmPassword || ''}
+                    onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    className={errors.confirmPassword ? 'border-red-500' : ''}
+                  />
+                  {errors.confirmPassword && <p className="text-red-500 text-sm">{errors.confirmPassword}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="birthDate">Birth Date</Label>
+                  <Input
+                    id="birthDate"
+                    type="date"
+                    value={signupData.birthDate || ''}
+                    onChange={(e) => setSignupData(prev => ({ ...prev, birthDate: e.target.value }))}
+                    className={errors.birthDate ? 'border-red-500' : ''}
+                  />
+                  {errors.birthDate && <p className="text-red-500 text-sm">{errors.birthDate}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select value={signupData.gender || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, gender: value as any }))}>
+                    <SelectTrigger className={errors.gender ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="non_binary">Non-binary</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.gender && <p className="text-red-500 text-sm">{errors.gender}</p>}
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="showGender"
+                  checked={signupData.showGender || false}
+                  onChange={(e) => setSignupData(prev => ({ ...prev, showGender: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label htmlFor="showGender" className="text-sm">Show my gender on my profile</Label>
+              </div>
+            </div>
+          </motion.div>
+        );
+
+      case 2:
+        return (
+          <motion.div
+            key="step2"
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Globe className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Where Are You From?</h2>
+              <p className="text-gray-600">Help us find matches in your area</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="country">Country</Label>
+                <Select value={signupData.country || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, country: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your country" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {countries.map(country => (
+                      <SelectItem key={country} value={country}>{country}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.country && <p className="text-red-500 text-sm">{errors.country}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  placeholder="Enter your city"
+                  value={signupData.city || ''}
+                  onChange={(e) => setSignupData(prev => ({ ...prev, city: e.target.value }))}
+                  className={errors.city ? 'border-red-500' : ''}
+                />
+                {errors.city && <p className="text-red-500 text-sm">{errors.city}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="tribe">Tribe/Ethnicity</Label>
+                <Select value={signupData.tribe || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, tribe: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your tribe/ethnicity" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {tribes.map(tribe => (
+                      <SelectItem key={tribe} value={tribe}>{tribe}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.tribe && <p className="text-red-500 text-sm">{errors.tribe}</p>}
+              </div>
+
+              <div>
+                <Label>Languages (Select all that apply)</Label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {languages.map(language => (
+                    <div key={language} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={language}
+                        checked={signupData.languages?.includes(language) || false}
+                        onChange={(e) => {
+                          const current = signupData.languages || [];
+                          if (e.target.checked) {
+                            setSignupData(prev => ({ ...prev, languages: [...current, language] }));
+                          } else {
+                            setSignupData(prev => ({ ...prev, languages: current.filter(l => l !== language) }));
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <Label htmlFor={language} className="text-sm">{language}</Label>
+                    </div>
+                  ))}
+                </div>
+                {errors.languages && <p className="text-red-500 text-sm">{errors.languages}</p>}
+              </div>
+            </div>
+          </motion.div>
+        );
+
+      case 3:
+        return (
+          <motion.div
+            key="step3"
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-r from-pink-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Camera className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Add Your Photos</h2>
+              <p className="text-gray-600">Show your best self to attract matches</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label>Upload Photos</Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-600 mb-4">Click to browse and upload your photos</p>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    id="photo-upload"
+                  />
+                  <label
+                    htmlFor="photo-upload"
+                    className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Choose Photos
+                  </label>
+                  <p className="text-xs text-gray-500 mt-4">JPG, PNG up to 5MB each • Max 6 photos</p>
+                </div>
+              </div>
+
+              {signupData.photos && signupData.photos.length > 0 && (
+                <div>
+                  <Label>Your Photos ({signupData.photos.length}/6)</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {signupData.photos.map((photo, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={photo}
+                          alt={`Photo ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                        <button
+                          onClick={() => removePhoto(index)}
+                          className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        {index === 0 && (
+                          <Badge className="absolute top-2 left-2 bg-purple-600 text-white">
+                            Main
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-purple-900 mb-1">Photo Tips</h4>
+                    <ul className="text-sm text-purple-800 space-y-1">
+                      <li>• Clear, recent photos work best</li>
+                      <li>• Show your face clearly</li>
+                      <li>• Include full-body shots</li>
+                      <li>• No filters or heavy editing</li>
+                      <li>• First photo will be your main profile picture</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        );
+
+      case 4:
+        return (
+          <motion.div
+            key="step4"
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-r from-red-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Heart className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">About You</h2>
+              <p className="text-gray-600">Tell us what makes you unique</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  placeholder="Tell us about yourself... What are you passionate about? What are you looking for?"
+                  rows={4}
+                  value={signupData.bio || ''}
+                  onChange={(e) => setSignupData(prev => ({ ...prev, bio: e.target.value }))}
+                  className={errors.bio ? 'border-red-500' : ''}
+                />
+                <div className="flex justify-between text-sm text-gray-500 mt-1">
+                  <span>{(signupData.bio || '').length}/500</span>
+                </div>
+                {errors.bio && <p className="text-red-500 text-sm">{errors.bio}</p>}
+              </div>
+
+              <div>
+                <Label>Interests (Select at least 3)</Label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {interests.map(interest => (
+                    <div key={interest.name} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={interest.name}
+                        checked={signupData.interests?.includes(interest.name) || false}
+                        onChange={(e) => {
+                          const current = signupData.interests || [];
+                          if (e.target.checked) {
+                            setSignupData(prev => ({ ...prev, interests: [...current, interest.name] }));
+                          } else {
+                            setSignupData(prev => ({ ...prev, interests: current.filter(i => i !== interest.name) }));
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <Label htmlFor={interest.name} className="text-sm flex items-center gap-1">
+                        <span>{interest.icon}</span>
+                        {interest.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {errors.interests && <p className="text-red-500 text-sm">{errors.interests}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="relationshipIntention">What Are You Looking For?</Label>
+                <Select value={signupData.relationshipIntention || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, relationshipIntention: value as any }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your relationship intention" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="looking_for_love">💕 Looking for Love</SelectItem>
+                    <SelectItem value="serious_only">💍 Serious Relationship Only</SelectItem>
+                    <SelectItem value="friends_first">🤝 Friends First</SelectItem>
+                    <SelectItem value="sugar_daddy">💰 Sugar Daddy</SelectItem>
+                    <SelectItem value="sugar_mommy">💰 Sugar Mommy</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.relationshipIntention && <p className="text-red-500 text-sm">{errors.relationshipIntention}</p>}
+              </div>
+            </div>
+          </motion.div>
+        );
+
+      case 5:
+        return (
+          <motion.div
+            key="step5"
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-r from-green-600 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Briefcase className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Lifestyle Details</h2>
+              <p className="text-gray-600">Help us understand your lifestyle better</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="height">Height</Label>
+                  <Select value={signupData.height || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, height: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select height" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="150">150cm</SelectItem>
+                      <SelectItem value="155">155cm</SelectItem>
+                      <SelectItem value="160">160cm</SelectItem>
+                      <SelectItem value="165">165cm</SelectItem>
+                      <SelectItem value="170">170cm</SelectItem>
+                      <SelectItem value="175">175cm</SelectItem>
+                      <SelectItem value="180">180cm</SelectItem>
+                      <SelectItem value="185">185cm</SelectItem>
+                      <SelectItem value="190">190cm</SelectItem>
+                      <SelectItem value="195">195cm</SelectItem>
+                      <SelectItem value="200">200cm+</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.height && <p className="text-red-500 text-sm">{errors.height}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="education">Education</Label>
+                  <Select value={signupData.education || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, education: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select education" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="High School">High School</SelectItem>
+                      <SelectItem value="Some College">Some College</SelectItem>
+                      <SelectItem value="Bachelor's Degree">Bachelor's Degree</SelectItem>
+                      <SelectItem value="Master's Degree">Master's Degree</SelectItem>
+                      <SelectItem value="PhD">PhD</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.education && <p className="text-red-500 text-sm">{errors.education}</p>}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="occupation">Occupation</Label>
+                <Input
+                  id="occupation"
+                  placeholder="What do you do for work?"
+                  value={signupData.occupation || ''}
+                  onChange={(e) => setSignupData(prev => ({ ...prev, occupation: e.target.value }))}
+                  className={errors.occupation ? 'border-red-500' : ''}
+                />
+                {errors.occupation && <p className="text-red-500 text-sm">{errors.occupation}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="drinking">Drinking</Label>
+                  <Select value={signupData.drinking || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, drinking: value as any }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select drinking habits" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">🚫 Never</SelectItem>
+                      <SelectItem value="socially">🍷 Socially</SelectItem>
+                      <SelectItem value="regularly">🍺 Regularly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.drinking && <p className="text-red-500 text-sm">{errors.drinking}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="smoking">Smoking</Label>
+                  <Select value={signupData.smoking || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, smoking: value as any }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select smoking habits" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="never">🚫 Never</SelectItem>
+                      <SelectItem value="socially">🚬 Socially</SelectItem>
+                      <SelectItem value="regularly">🚬 Regularly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.smoking && <p className="text-red-500 text-sm">{errors.smoking}</p>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="kids">Kids</Label>
+                  <Select value={signupData.kids || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, kids: value as any }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select preference" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="dont_want">🚫 Don't want kids</SelectItem>
+                      <SelectItem value="want_someday">👶 Want someday</SelectItem>
+                      <SelectItem value="have_kids">👨‍👩‍👧‍👦 Have kids</SelectItem>
+                      <SelectItem value="open_to_kids">🤗 Open to kids</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.kids && <p className="text-red-500 text-sm">{errors.kids}</p>}
+                </div>
+
+                <div>
+                  <Label htmlFor="religion">Religion</Label>
+                  <Select value={signupData.religion || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, religion: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select religion" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Christian">✝️ Christian</SelectItem>
+                      <SelectItem value="Muslim">☪️ Muslim</SelectItem>
+                      <SelectItem value="Hindu">🕉️ Hindu</SelectItem>
+                      <SelectItem value="Buddhist">☸️ Buddhist</SelectItem>
+                      <SelectItem value="Jewish">✡️ Jewish</SelectItem>
+                      <SelectItem value="Spiritual">🧘 Spiritual</SelectItem>
+                      <SelectItem value="Agnostic">❓ Agnostic</SelectItem>
+                      <SelectItem value="Atheist">🚫 Atheist</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.religion && <p className="text-red-500 text-sm">{errors.religion}</p>}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        );
+
+      case 6:
+        return (
+          <motion.div
+            key="step6"
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Music className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">Connect Your Socials</h2>
+              <p className="text-gray-600">Optional - Help others find you</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="instagram">Instagram Username (Optional)</Label>
+                <Input
+                  id="instagram"
+                  placeholder="@yourusername"
+                  value={signupData.instagram || ''}
+                  onChange={(e) => setSignupData(prev => ({ ...prev, instagram: e.target.value }))}
+                  className={errors.instagram ? 'border-red-500' : ''}
+                />
+                {errors.instagram && <p className="text-red-500 text-sm">{errors.instagram}</p>}
+              </div>
+
+              <div>
+                <Label htmlFor="spotify">Spotify Profile (Optional)</Label>
+                <Input
+                  id="spotify"
+                  placeholder="Your Spotify profile URL"
+                  value={signupData.spotify || ''}
+                  onChange={(e) => setSignupData(prev => ({ ...prev, spotify: e.target.value }))}
+                  className={errors.spotify ? 'border-red-500' : ''}
+                />
+                {errors.spotify && <p className="text-red-500 text-sm">{errors.spotify}</p>}
+              </div>
+
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6">
+                <div className="text-center">
+                  <Star className="w-12 h-12 text-purple-600 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">You're All Set! 🎉</h3>
+                  <p className="text-gray-600 mb-4">
+                    Your profile is ready to go. Click "Create Account" to join LoveX and start meeting amazing people!
+                  </p>
+                  <div className="flex items-center justify-center gap-2 text-sm text-purple-600">
+                    <Shield className="w-4 h-4" />
+                    <span>Your information is secure and private</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/auth')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Login
+          </Button>
+          
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900">Join LoveX</h1>
+            <p className="text-sm text-gray-600">Where East African Hearts Connect</p>
+          </div>
+          
+          <div className="w-20" /> {/* Spacer for centering */}
+        </div>
+
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">Step {currentStep} of {totalSteps}</span>
+            <span className="text-sm font-medium text-purple-600">{Math.round(progress)}% Complete</span>
+          </div>
+          <Progress value={progress} className="h-3" />
+          <div className="flex justify-between mt-2">
+            {Array.from({ length: totalSteps }, (_, i) => (
+              <div
+                key={i}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
+                  i + 1 <= currentStep
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-200 text-gray-500'
+                }`}
+              >
+                {i + 1}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <Card className="max-w-4xl mx-auto shadow-xl">
+          <CardContent className="p-8">
+            <AnimatePresence mode="wait">
+              {renderStep()}
+            </AnimatePresence>
+            
+            {/* Navigation */}
+            <div className="flex justify-between mt-8">
+              <Button
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentStep === 1}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Previous
+              </Button>
+              
+              <Button
+                onClick={handleNext}
+                disabled={isLoading}
+                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 px-8"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : currentStep === totalSteps ? (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Create Account
+                  </>
+                ) : (
+                  <>
+                    {currentStep === totalSteps - 1 ? 'Review' : 'Next'}
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Footer */}
+        <div className="text-center mt-8 text-gray-600">
+          <p className="text-sm">
+            By creating an account, you agree to our{' '}
+            <a href="/terms" className="text-purple-600 hover:text-purple-700 underline">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href="/privacy" className="text-purple-600 hover:text-purple-700 underline">
+              Privacy Policy
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SimpleSignupFlow;

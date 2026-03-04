@@ -1,7 +1,6 @@
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
-import { BottomNav } from './BottomNav';
 import { Sidebar } from './Sidebar';
 import { Navbar } from './Navbar';
 
@@ -30,27 +29,22 @@ export const AuthLayout: React.FC = () => {
         <Sidebar />
       </div>
 
-      {/* Tablet/Desktop Navbar */}
-      <div className="hidden md:block lg:hidden">
+      {/* Tablet/Desktop/Mobile Navbar */}
+      <div className="block lg:hidden">
         <Navbar />
       </div>
 
       {/* Main Content */}
       <main className={`
         lg:ml-64 /* Sidebar width */
-        md:pt-16 /* Navbar height */
-        pb-20 md:pb-6 /* Bottom nav spacing */
+        pt-16 /* Navbar height for all screen sizes */
+        pb-6 /* Standard bottom padding */
         min-h-screen
       `}>
         <div className="container mx-auto px-4 py-6">
           <Outlet />
         </div>
       </main>
-
-      {/* Mobile Bottom Navigation */}
-      <div className="md:hidden">
-        <BottomNav />
-      </div>
     </div>
   );
 };
