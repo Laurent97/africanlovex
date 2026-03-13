@@ -40,26 +40,24 @@ import { AuthGuard } from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
+import { searchProfiles } from '@/lib/profile';
 
 interface PotentialMatch {
   id: string;
   username: string;
-  full_name: string;
-  age: number;
-  city: string;
-  country: string;
-  bio: string;
-  occupation: string;
-  avatar_url: string;
-  photos?: string[];
-  interests: string[];
+  full_name: string | null;
+  age: number | null;
+  city: string | null;
+  country: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  interests: string[] | null;
+  languages: string[] | null;
+  relationship_intention: string | null;
   is_verified: boolean;
-  verification_level: string;
+  verification_level: 'basic' | 'standard' | 'premium';
+  vip_tier: 'free' | 'basic' | 'premium' | 'platinum' | 'diamond';
   distance?: number;
-  last_active?: string;
-  languages: string[];
-  relationship_intention: string;
-  vip_tier: string;
   match_percentage?: number;
   is_online?: boolean;
 }
@@ -174,7 +172,6 @@ const MatchingContent = () => {
                 city: profile.city || '',
                 country: profile.country,
                 bio: profile.bio || '',
-                occupation: '',
                 avatar_url: profile.avatar_url || '',
                 interests: profile.interests || [],
                 is_verified: profile.is_verified || false,
@@ -213,75 +210,54 @@ const MatchingContent = () => {
 
       const swipedIds = swipedProfiles?.map(s => s.profile_id) || [];
 
-      // Get potential matches (exclude self and already swiped profiles)
-      let query = supabase
-        .from('profiles')
-        .select(`
-          id,
-          username,
-          full_name,
-          age,
-          city,
-          country,
-          bio,
-          avatar_url,
-          interests,
-          is_verified,
-          verification_level,
-          languages,
-          relationship_intention,
-          vip_tier,
-          created_at
-        `)
-        .neq('id', user.id)
-        .gte('age', filterAgeRange[0])
-        .lte('age', filterAgeRange[1])
-        .order('created_at', { ascending: false });
+      // Use searchProfiles function like Discover page
+      const { profiles } = await searchProfiles({
+        age_min: filterAgeRange[0],
+        age_max: filterAgeRange[1],
+        limit: 50
+      });
 
-      if (swipedIds.length > 0) {
-        query = query.not('id', 'in', `(${swipedIds.join(',')})`);
-      }
+      // Filter out already swiped profiles and current user
+      let filteredProfiles = (profiles || []).filter(profile => 
+        profile.id !== user.id && 
+        !swipedIds.includes(profile.id)
+      );
 
+      // Apply additional filters
       if (showOnlyVerified) {
-        query = query.eq('is_verified', true);
+        filteredProfiles = filteredProfiles.filter(profile => profile.is_verified);
       }
-
-      const { data: profiles, error } = await query;
-
-      if (error) throw error;
 
       // Transform profiles to match our interface
-      const transformedProfiles: PotentialMatch[] = (profiles || []).map(profile => ({
+      const transformedProfiles: PotentialMatch[] = filteredProfiles.map(profile => ({
         id: profile.id,
         username: profile.username,
-        full_name: profile.full_name || profile.username,
-        age: profile.age || 0,
-        city: profile.city || '',
+        full_name: profile.full_name,
+        age: profile.age,
+        city: profile.city,
         country: profile.country,
-        bio: profile.bio || 'No bio yet',
-        occupation: '', // This would need to be added to profiles table
-        avatar_url: profile.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.full_name || profile.username)}&background=B11D2D&color=fff`,
-        photos: profile.avatar_url ? [profile.avatar_url] : [],
-        interests: profile.interests || [],
-        is_verified: profile.is_verified || false,
-        verification_level: profile.verification_level || 'basic',
-        languages: profile.languages || ['English'],
-        relationship_intention: profile.relationship_intention || 'looking_for_love',
-        vip_tier: profile.vip_tier || 'free',
-        // Calculate match percentage based on compatibility
+        bio: profile.bio,
+        avatar_url: profile.avatar_url,
+        interests: profile.interests,
+        languages: profile.languages,
+        relationship_intention: profile.relationship_intention,
+        is_verified: profile.is_verified,
+        verification_level: profile.verification_level,
+        vip_tier: profile.vip_tier,
+        distance: Math.floor(Math.random() * 50) + 1, // Placeholder distance calculation
         match_percentage: calculateMatchPercentage(user, profile),
-        // Simulate online status (you'd need a real-time presence system for this)
-        is_online: Math.random() > 0.5,
-        last_active: new Date(Date.now() - Math.random() * 86400000).toISOString()
+        is_online: Math.random() > 0.5 // Placeholder online status
       }));
 
       // Sort by match percentage
       transformedProfiles.sort((a, b) => (b.match_percentage || 0) - (a.match_percentage || 0));
 
       setMatches(transformedProfiles);
-    } catch (error: any) {
-      console.error('Error loading matches:', error);
-      setError(error.message);
+      setCurrentIndex(0);
+      setError('');
+    } catch (error) {
+      console.error('Error loading potential matches:', error);
+      setError('Failed to load potential matches');
     } finally {
       setLoading(false);
     }
@@ -382,7 +358,6 @@ const MatchingContent = () => {
               city: profile.city || '',
               country: profile.country,
               bio: profile.bio || '',
-              occupation: '',
               avatar_url: profile.avatar_url || '',
               interests: profile.interests || [],
               is_verified: profile.is_verified || false,

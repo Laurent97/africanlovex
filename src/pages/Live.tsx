@@ -1,81 +1,27 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { DraggableWrapper } from '@/components/ui/DraggableWrapper';
 import { 
-  Video, 
-  VideoOff, 
-  Mic, 
-  MicOff, 
-  Gift, 
-  Heart, 
-  Users, 
-  Eye, 
-  Share2, 
-  MoreVertical,
-  Sparkles,
-  Crown,
-  Star,
-  Music,
-  Gamepad2,
-  Coffee,
-  Book,
-  Camera,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  MessageCircle,
-  Send,
-  Maximize2,
-  Minimize2,
-  Settings,
-  Download,
-  ThumbsUp,
-  Award,
-  Flame,
-  Gem,
-  Zap,
-  Globe,
-  MapPin,
-  Calendar,
-  Clock,
-  AlertCircle,
-  Shield,
-  ChevronDown,
-  ChevronUp,
-  Move,
-  Pin,
-  PinOff,
-  Loader2,
-  Wifi,
-  WifiOff,
-  User,
-  Users2,
-  MessageSquare,
-  ThumbsUp as ThumbsUpIcon,
-  Gift as GiftIcon,
-  Menu,
-  Home,
-  Compass,
-  Wallet,
-  Bell,
-  Settings as SettingsIcon
+  Video, VideoOff, Mic, MicOff, Gift, Heart, Users, Eye, 
+  Share2, Sparkles, Crown, Star, Music, Gamepad2, Coffee,
+  Book, Camera, X, ChevronLeft, ChevronRight, MessageCircle,
+  Send, Maximize2, Minimize2, Settings, ThumbsUp, Flame,
+  Zap, Globe, MapPin, Clock, AlertCircle, Shield, ChevronDown,
+  ChevronUp, Move, Pin, PinOff, Loader2, User, Menu, Lock,
+  Wifi, WifiOff, Volume2, VolumeX, Download, Award, Gem
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
 // Types
 interface LiveStream {
@@ -100,6 +46,10 @@ interface LiveStream {
   room_type: 'public' | 'private' | 'speed_dating';
   max_viewers: number;
   cost_per_minute?: number;
+  dating_focus?: string;
+  min_age_preference?: number;
+  max_age_preference?: number;
+  gender_preference?: string[];
 }
 
 interface LiveComment {
@@ -116,6 +66,7 @@ interface LiveComment {
   gift_value?: number;
   is_highlighted?: boolean;
   is_system?: boolean;
+  is_dating_interest?: boolean;
 }
 
 interface RoomParticipant {
@@ -128,6 +79,9 @@ interface RoomParticipant {
   is_host: boolean;
   is_muted: boolean;
   is_video_enabled: boolean;
+  is_interested?: boolean;
+  age?: number;
+  relationship_intention?: string;
 }
 
 interface Gift {
@@ -142,108 +96,38 @@ interface Gift {
   is_active: boolean;
 }
 
-interface ChatSettings {
-  isMinimized: boolean;
-  isPinned: boolean;
-  width: number;
-  height: number;
-  position: { x: number; y: number };
-  fontSize: 'sm' | 'base' | 'lg';
-  showTimestamps: boolean;
-  showAvatars: boolean;
-}
+// Mobile-First Components
 
-// Live Thumbnail Component
-const LiveThumbnail: React.FC<{ streamId: string; isActive: boolean; className?: string }> = ({ streamId, isActive, className }) => {
-  const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const captureFrame = useCallback(() => {
-    if (videoRef.current && canvasRef.current && !videoRef.current.paused && !videoRef.current.ended) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        canvas.width = 400;
-        canvas.height = 300;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setThumbnailUrl(dataUrl);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isActive) {
-      // Set placeholder for inactive streams
-      setThumbnailUrl('https://images.unsplash.com/photo-1471471886143-281d93bce7e?w=400&h=300&fit=crop');
-      if (captureIntervalRef.current) {
-        clearInterval(captureIntervalRef.current);
-        captureIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // Try to find the video element for this stream
-    const findVideoElement = () => {
-      const videoElements = document.querySelectorAll('video');
-      for (const video of videoElements) {
-        if (video.srcObject && (video.srcObject as MediaStream).active) {
-          return video;
-        }
-      }
-      return null;
-    };
-
-    const video = findVideoElement();
-    if (video) {
-      videoRef.current = video;
-      
-      // Capture initial frame
-      captureFrame();
-      
-      // Set up interval to capture frames every 2 seconds
-      captureIntervalRef.current = setInterval(captureFrame, 2000);
-    } else {
-      // Fallback to placeholder if no video found
-      setThumbnailUrl(`https://picsum.photos/seed/${streamId}/400/300`);
-    }
-
-    return () => {
-      if (captureIntervalRef.current) {
-        clearInterval(captureIntervalRef.current);
-        captureIntervalRef.current = null;
-      }
-    };
-  }, [isActive, streamId, captureFrame]);
-
+const LiveThumbnail: React.FC<{ stream: LiveStream; className?: string }> = ({ stream, className }) => {
   return (
-    <>
-      <div className="relative w-full h-full">
-        <img
-          src={thumbnailUrl}
-          alt="Live stream thumbnail"
-          className={`w-full h-full object-cover ${className}`}
-        />
-        {isActive && (
-          <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-red-600 text-white text-xs font-medium shadow-lg">
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-            LIVE
-          </div>
-        )}
+    <div className="relative w-full h-full">
+      <img
+        src={stream.thumbnail_url}
+        alt={`${stream.host_name}'s live stream`}
+        className={cn("w-full h-full object-cover", className)}
+        loading="lazy"
+        onError={(e) => {
+          // Fallback to generated placeholder if thumbnail fails to load
+          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(stream.host_name)}&size=400&background=B11D2D&color=fff&format=png`;
+        }}
+      />
+      {stream.is_active && (
+        <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-red-600 text-white text-xs font-medium shadow-lg">
+          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+          LIVE
+        </div>
+      )}
+      <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-xs font-medium">
+        <Users className="w-3 h-3" />
+        {stream.viewer_count}
       </div>
-      {/* Hidden canvas for frame capture */}
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
-    </>
+    </div>
   );
 };
 
-// Participant Avatar Component
-const ParticipantAvatar: React.FC<{ participant: RoomParticipant; size?: 'sm' | 'md' | 'lg' }> = ({ participant, size = 'md' }) => {
+const ParticipantAvatar: React.FC<{ participant: RoomParticipant; size?: 'sm' | 'md' | 'lg'; onClick?: () => void }> = ({ 
+  participant, size = 'md', onClick 
+}) => {
   const sizeClasses = {
     sm: 'w-8 h-8',
     md: 'w-10 h-10',
@@ -251,23 +135,36 @@ const ParticipantAvatar: React.FC<{ participant: RoomParticipant; size?: 'sm' | 
   };
 
   return (
-    <div className="relative group">
-      <Avatar className={`${sizeClasses[size]} ring-2 ring-white/20 group-hover:ring-rose-500 transition-all`}>
+    <div className="relative group" onClick={onClick}>
+      <Avatar className={cn(
+        sizeClasses[size],
+        "ring-2 ring-white/20 group-hover:ring-rose-500 transition-all cursor-pointer"
+      )}>
         <AvatarImage src={participant.user_avatar} />
         <AvatarFallback className="bg-gradient-to-r from-rose-500 to-purple-500 text-white">
           {participant.user_name[0]}
         </AvatarFallback>
       </Avatar>
+      
       {participant.user_vip_tier && participant.user_vip_tier !== 'free' && (
         <div className="absolute -top-1 -right-1">
-          <Badge className="w-4 h-4 p-0 bg-amber-500 border-2 border-white">
+          <Badge className="w-4 h-4 p-0 bg-amber-500 border-2 border-white rounded-full">
             <Crown className="w-2 h-2 text-white" />
           </Badge>
         </div>
       )}
+      
+      {participant.is_interested && (
+        <div className="absolute -bottom-1 -right-1">
+          <Badge className="w-4 h-4 p-0 bg-rose-500 border-2 border-white rounded-full">
+            <Heart className="w-2 h-2 text-white" />
+          </Badge>
+        </div>
+      )}
+      
       {participant.is_host && (
         <div className="absolute -bottom-1 -left-1">
-          <Badge className="w-4 h-4 p-0 bg-rose-500 border-2 border-white">
+          <Badge className="w-4 h-4 p-0 bg-purple-500 border-2 border-white rounded-full">
             <Star className="w-2 h-2 text-white" />
           </Badge>
         </div>
@@ -276,7 +173,6 @@ const ParticipantAvatar: React.FC<{ participant: RoomParticipant; size?: 'sm' | 
   );
 };
 
-// Gift Inventory Component
 const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () => void }> = ({ onSendGift, onClose }) => {
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [selectedTier, setSelectedTier] = useState<string>('all');
@@ -304,12 +200,12 @@ const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () =>
   };
 
   const tiers = [
-    { id: 'all', label: 'All Gifts', icon: '🎁' },
+    { id: 'all', label: 'All', icon: '🎁' },
     { id: 'everyday', label: 'Everyday', icon: '💝' },
     { id: 'romantic', label: 'Romantic', icon: '🌹' },
     { id: 'serious', label: 'Serious', icon: '💍' },
     { id: 'legendary', label: 'Legendary', icon: '👑' },
-    { id: 'real_world', label: 'Real World', icon: '🌍' }
+    { id: 'real_world', label: 'Real', icon: '🌍' }
   ];
 
   const filteredGifts = selectedTier === 'all' 
@@ -329,36 +225,37 @@ const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () =>
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-2xl shadow-2xl overflow-hidden border border-white/10 w-full h-[85vh] sm:h-[80vh] max-w-2xl mx-4 sm:mx-auto"
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 50 }}
+      className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden border border-white/10 w-full max-w-lg mx-auto"
     >
-      <div className="p-3 sm:p-4 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-rose-600 to-purple-600">
-        <h3 className="text-white font-semibold flex items-center gap-2 text-base sm:text-lg">
-          <Gift className="w-4 h-4 sm:w-5 sm:h-5" />
-          Gift Inventory
+      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-rose-600 to-purple-600 sticky top-0">
+        <h3 className="text-white font-semibold flex items-center gap-2">
+          <Gift className="w-5 h-5" />
+          Gift Shop
         </h3>
-        <Button onClick={onClose} variant="ghost" size="sm" className="text-white hover:bg-white/20 p-2 sm:p-1">
-          <X className="w-4 h-4" />
+        <Button onClick={onClose} variant="ghost" size="sm" className="text-white hover:bg-white/20">
+          <X className="w-5 h-5" />
         </Button>
       </div>
 
-      <div className="p-3 sm:p-4 flex flex-col h-full">
+      <div className="p-4 max-h-[70vh] overflow-y-auto">
         {/* Tier Filters */}
-        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-3 sm:pb-4 mb-3 sm:mb-4 scrollbar-hide">
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
           {tiers.map((tier) => (
             <button
               key={tier.id}
               onClick={() => setSelectedTier(tier.id)}
-              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm whitespace-nowrap transition-all min-w-fit ${
+              className={cn(
+                "flex items-center gap-1 px-4 py-2 rounded-full text-sm whitespace-nowrap transition-all",
                 selectedTier === tier.id
                   ? `bg-gradient-to-r ${getTierColor(tier.id)} text-white shadow-lg`
                   : 'bg-white/10 text-white/70 hover:bg-white/20'
-              }`}
+              )}
             >
-              <span className="text-sm sm:text-base">{tier.icon}</span>
-              <span className="hidden xs:inline sm:inline">{tier.label}</span>
+              <span>{tier.icon}</span>
+              <span className="hidden xs:inline">{tier.label}</span>
             </button>
           ))}
         </div>
@@ -369,25 +266,28 @@ const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () =>
             <Loader2 className="w-8 h-8 text-rose-500 animate-spin" />
           </div>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4 overflow-y-auto flex-1 p-1 sm:p-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {filteredGifts.map((gift) => (
               <motion.button
                 key={gift.id}
-                whileHover={{ scale: 1.05, y: -4 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => onSendGift(gift)}
-                className="bg-gradient-to-b from-white/10 to-white/5 rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 hover:shadow-xl transition-all group min-h-[100px] sm:min-h-[120px] flex flex-col items-center justify-center"
+                className="bg-gradient-to-b from-white/10 to-white/5 rounded-xl p-3 hover:shadow-xl transition-all group"
               >
-                <div className="relative mb-1 sm:mb-2">
-                  <div className={`w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 mx-auto rounded-full bg-gradient-to-br ${getTierColor(gift.tier)} flex items-center justify-center text-xl sm:text-2xl md:text-3xl group-hover:scale-110 transition-transform`}>
+                <div className="relative mb-2">
+                  <div className={cn(
+                    "w-12 h-12 mx-auto rounded-full bg-gradient-to-br flex items-center justify-center text-2xl group-hover:scale-110 transition-transform",
+                    getTierColor(gift.tier)
+                  )}>
                     {gift.icon_url || '🎁'}
                   </div>
                   {gift.tier === 'legendary' && (
-                    <Sparkles className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 animate-pulse" />
+                    <Sparkles className="absolute -top-1 -right-1 w-3 h-3 text-yellow-500 animate-pulse" />
                   )}
                 </div>
-                <h4 className="text-white font-medium text-xs sm:text-sm mb-1 text-center line-clamp-1">{gift.name}</h4>
-                <p className="text-rose-400 font-bold text-xs sm:text-sm">{gift.cost_coins} LX</p>
+                <h4 className="text-white font-medium text-xs text-center mb-1 line-clamp-1">{gift.name}</h4>
+                <p className="text-rose-400 font-bold text-xs text-center">{gift.cost_coins} 💎</p>
               </motion.button>
             ))}
           </div>
@@ -397,7 +297,6 @@ const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () =>
   );
 };
 
-// Main Component
 const Live = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -418,7 +317,7 @@ const Live = () => {
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [showGoLive, setShowGoLive] = useState(false);
   const [streamTitle, setStreamTitle] = useState('');
-  const [streamCategory, setStreamCategory] = useState('entertainment');
+  const [streamCategory, setStreamCategory] = useState('icebreakers');
   const [streamType, setStreamType] = useState<'public' | 'private' | 'speed_dating'>('public');
   const [maxViewers, setMaxViewers] = useState(100);
   const [costPerMinute, setCostPerMinute] = useState(0);
@@ -426,81 +325,48 @@ const Live = () => {
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showGiftMenu, setShowGiftMenu] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [isChatVisible, setIsChatVisible] = useState(true);
-  const [chatSettings, setChatSettings] = useState<ChatSettings>({
-    isMinimized: false,
-    isPinned: true,
-    width: 320,
-    height: 500,
-    position: { x: window.innerWidth - 340, y: 100 },
-    fontSize: 'base',
-    showTimestamps: true,
-    showAvatars: true
-  });
-  const [isDragging, setIsDragging] = useState(false);
-  const [showEmotes, setShowEmotes] = useState(false);
-  const [replyToComment, setReplyToComment] = useState<LiveComment | null>(null);
-  const [newStreamNotification, setNewStreamNotification] = useState<LiveStream | null>(null);
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [showIcebreakers, setShowIcebreakers] = useState(false);
+  const [showProfileCard, setShowProfileCard] = useState(false);
+  const [speedDatingTimer, setSpeedDatingTimer] = useState(300);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(true);
   const [streamDuration, setStreamDuration] = useState(0);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showParticipants, setShowParticipants] = useState(false);
-  const [gifts, setGifts] = useState<Gift[]>([]);
+  const [newStreamNotification, setNewStreamNotification] = useState<LiveStream | null>(null);
+  const [replyToComment, setReplyToComment] = useState<LiveComment | null>(null);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<RoomParticipant | null>(null);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout>();
 
   const categories = [
     { value: 'all', label: 'All', icon: <Globe className="w-4 h-4" /> },
-    { value: 'entertainment', label: 'Entertainment', icon: <Music className="w-4 h-4" /> },
-    { value: 'advice', label: 'Advice', icon: <Book className="w-4 h-4" /> },
-    { value: 'lifestyle', label: 'Lifestyle', icon: <Coffee className="w-4 h-4" /> },
-    { value: 'gaming', label: 'Gaming', icon: <Gamepad2 className="w-4 h-4" /> },
-    { value: 'creative', label: 'Creative', icon: <Camera className="w-4 h-4" /> },
-    { value: 'health', label: 'Health', icon: <Heart className="w-4 h-4" /> }
+    { value: 'icebreakers', label: 'Ice Breakers', icon: <MessageCircle className="w-4 h-4" /> },
+    { value: 'speed_dating', label: 'Speed Dating', icon: <Zap className="w-4 h-4" /> },
+    { value: 'date_ideas', label: 'Date Ideas', icon: <Coffee className="w-4 h-4" /> },
+    { value: 'relationship_advice', label: 'Advice', icon: <Heart className="w-4 h-4" /> },
+    { value: 'first_dates', label: 'First Dates', icon: <Sparkles className="w-4 h-4" /> }
   ];
 
-  const emotes = [
-    { emote: '❤️', name: 'heart' },
-    { emote: '😊', name: 'smile' },
-    { emote: '🔥', name: 'fire' },
-    { emote: '🎉', name: 'party' },
-    { emote: '👏', name: 'clap' },
-    { emote: '👍', name: 'like' },
-    { emote: '😍', name: 'love' },
-    { emote: '😂', name: 'laugh' },
-    { emote: '😢', name: 'sad' },
-    { emote: '😮', name: 'wow' },
-    { emote: '🙏', name: 'pray' },
-    { emote: '💀', name: 'skull' }
+  const icebreakerQuestions = [
+    "What's your ideal first date?",
+    "Do you prefer cats or dogs?",
+    "What's your love language?",
+    "What are you looking for in a relationship?",
+    "What's your favorite romantic movie?",
+    "Where's the best place for a first date?",
+    "What's your biggest dating pet peeve?",
+    "How do you know when you like someone?"
   ];
 
-  // Load gifts on mount
-  useEffect(() => {
-    loadGifts();
-  }, []);
-
-  const loadGifts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('gifts')
-        .select('*')
-        .eq('is_active', true)
-        .order('cost_coins', { ascending: true });
-
-      if (error) throw error;
-      setGifts(data || []);
-    } catch (error) {
-      console.error('Error loading gifts:', error);
-    }
-  };
-
-  // Load live streams on mount
+  // Load data
   useEffect(() => {
     loadLiveStreams();
+    loadGifts();
 
     const roomsSubscription = supabase
       .channel('live-rooms-changes')
@@ -516,11 +382,21 @@ const Live = () => {
       roomsSubscription.unsubscribe();
       participantsSubscription.unsubscribe();
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
-      if (localStream) localStream.getTracks().forEach(track => track.stop());
+      
+      // Clean up media stream
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        setLocalStream(null);
+      }
+      
+      // End live stream if still active (fire and forget for cleanup)
+      if (isLive && isHost && selectedStream) {
+        supabase.from('live_rooms').update({ is_active: false }).eq('id', selectedStream.id);
+        supabase.from('room_participants').delete().eq('room_id', selectedStream.id);
+      }
     };
   }, []);
 
-  // Auto-join stream from URL
   useEffect(() => {
     if (streamId && liveStreams.length > 0) {
       const stream = liveStreams.find(s => s.id === streamId);
@@ -528,7 +404,52 @@ const Live = () => {
     }
   }, [streamId, liveStreams]);
 
-  // Subscribe to comments when stream is selected
+  // Auto-end stream when user leaves or closes page (unless minimized)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isLive && isHost && selectedStream) {
+        // End the stream before page unload
+        handleStopLive();
+        // Show confirmation dialog
+        e.preventDefault();
+        e.returnValue = 'Your live stream will end. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && isLive && isHost && selectedStream) {
+        // Page is hidden (minimized or tab switched)
+        // Don't end stream on minimize, only on actual close/navigation away
+        console.log('Page hidden, keeping stream alive for potential minimize');
+      }
+    };
+
+    const handlePageHide = (e: PageTransitionEvent) => {
+      if (isLive && isHost && selectedStream) {
+        // User is navigating away or closing tab
+        handleStopLive();
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      // Cleanup event listeners
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      
+      // End stream if component unmounts while live
+      if (isLive && isHost && selectedStream) {
+        handleStopLive();
+      }
+    };
+  }, [isLive, isHost, selectedStream]);
+
   useEffect(() => {
     if (selectedStream) {
       loadStreamComments(selectedStream.id);
@@ -548,6 +469,20 @@ const Live = () => {
         }
       }, 1000);
 
+      if (selectedStream.room_type === 'speed_dating') {
+        const timer = setInterval(() => {
+          setSpeedDatingTimer(prev => {
+            if (prev <= 1) {
+              // Rotate participants
+              rotateSpeedDatingParticipants();
+              return 300;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        return () => clearInterval(timer);
+      }
+
       return () => {
         commentsSubscription.unsubscribe();
         clearInterval(interval);
@@ -556,25 +491,25 @@ const Live = () => {
     }
   }, [selectedStream]);
 
-  // Connect video stream
   useEffect(() => {
-    if (videoRef && localStream) videoRef.srcObject = localStream;
+    if (videoRef && localStream) {
+      videoRef.srcObject = localStream;
+    }
   }, [videoRef, localStream]);
 
-  // Scroll to bottom of chat
   useEffect(() => {
-    if (commentsEndRef.current && !chatSettings.isMinimized) {
+    if (commentsEndRef.current) {
       commentsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [comments, chatSettings.isMinimized]);
+  }, [comments]);
 
-  // Add welcome message
   useEffect(() => {
     if (selectedStream && !isHost) {
       addSystemMessage(`👋 Welcome to ${selectedStream.host_name}'s stream!`);
     }
   }, [selectedStream, isHost]);
 
+  // Data functions
   const loadLiveStreams = async () => {
     try {
       setLoading(true);
@@ -592,7 +527,9 @@ const Live = () => {
             city,
             country,
             age,
-            bio
+            bio,
+            relationship_intention,
+            interests
           )
         `)
         .eq('is_active', true)
@@ -603,12 +540,12 @@ const Live = () => {
       const streams: LiveStream[] = (data || []).map(room => ({
         id: room.id,
         host_id: room.host_id,
-        host_name: room.host?.full_name || room.host?.username || 'Anonymous',
+        host_name: room.host?.full_name || room.host?.username || `User_${room.host_id?.slice(0, 8)}`,
         host_username: room.host?.username || '',
         host_avatar: room.host?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(room.host?.username || 'User')}&background=B11D2D&color=fff`,
         title: room.title,
         category: room.category || 'entertainment',
-        thumbnail_url: room.thumbnail_url || 'https://images.unsplash.com/photo-1471471886143-281d93bce7e?w=400&h=300&fit=crop',
+        thumbnail_url: room.thumbnail_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(room.host?.username || 'Live')}&size=400&background=B11D2D&color=fff&format=png`,
         viewer_count: room.viewer_count || 0,
         is_active: room.is_active,
         started_at: room.created_at,
@@ -621,7 +558,11 @@ const Live = () => {
         bio: room.host?.bio,
         room_type: room.room_type,
         max_viewers: room.max_viewers,
-        cost_per_minute: room.cost_per_minute
+        cost_per_minute: room.cost_per_minute,
+        dating_focus: room.dating_focus,
+        min_age_preference: room.min_age_preference,
+        max_age_preference: room.max_age_preference,
+        gender_preference: room.gender_preference
       }));
 
       setLiveStreams(streams);
@@ -630,6 +571,20 @@ const Live = () => {
       toast({ title: 'Error', description: 'Failed to load live streams', variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadGifts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('gifts')
+        .select('*')
+        .eq('is_active', true)
+        .order('cost_coins', { ascending: true });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error loading gifts:', error);
     }
   };
 
@@ -661,12 +616,13 @@ const Live = () => {
       const loadedComments: LiveComment[] = (data || []).map((msg: any) => ({
         id: msg.id,
         user_id: msg.sender_id,
-        user_name: msg.sender?.full_name || msg.sender?.username || 'Anonymous',
+        user_name: msg.sender?.full_name || msg.sender?.username || `User_${msg.sender_id?.slice(0, 8)}`,
         user_avatar: msg.sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender?.username || 'User')}&background=B11D2D&color=fff`,
         user_vip_tier: msg.sender?.vip_tier,
         message: msg.content,
         created_at: msg.created_at,
-        is_gift: msg.message_type === 'gift'
+        is_gift: msg.message_type === 'gift',
+        is_dating_interest: msg.message_type === 'dating_interest'
       }));
 
       setComments(loadedComments);
@@ -688,9 +644,10 @@ const Live = () => {
           is_video_enabled,
           user:user_id (
             username,
-            full_name,
             avatar_url,
-            vip_tier
+            vip_tier,
+            age,
+            relationship_intention
           )
         `)
         .eq('room_id', roomId);
@@ -704,13 +661,15 @@ const Live = () => {
       const loadedParticipants: RoomParticipant[] = (data || []).map((p: any) => ({
         id: p.id,
         user_id: p.user_id,
-        user_name: p.user?.full_name || p.user?.username || 'Anonymous',
+        user_name: p.user?.full_name || p.user?.username || `User_${p.user_id?.slice(0, 8)}`,
         user_avatar: p.user?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.user?.username || 'User')}&background=B11D2D&color=fff`,
         user_vip_tier: p.user?.vip_tier,
         joined_at: p.joined_at,
         is_host: p.is_host,
         is_muted: p.is_muted,
-        is_video_enabled: p.is_video_enabled
+        is_video_enabled: p.is_video_enabled,
+        age: p.user?.age,
+        relationship_intention: p.user?.relationship_intention
       }));
 
       setParticipants(loadedParticipants);
@@ -735,6 +694,7 @@ const Live = () => {
     }
   };
 
+  // Event handlers
   const handleRoomChange = (payload: any) => {
     if (payload.eventType === 'INSERT' && payload.new.room_type === 'public') {
       supabase
@@ -746,7 +706,7 @@ const Live = () => {
           const newStream: LiveStream = {
             id: payload.new.id,
             host_id: payload.new.host_id,
-            host_name: host?.full_name || host?.username || 'Anonymous',
+            host_name: host?.full_name || host?.username || `User_${payload.new.host_id?.slice(0, 8)}`,
             host_username: host?.username || '',
             host_avatar: host?.avatar_url || '',
             title: payload.new.title,
@@ -791,12 +751,13 @@ const Live = () => {
     const newComment: LiveComment = {
       id: message.id,
       user_id: message.sender_id,
-      user_name: sender?.full_name || sender?.username || 'Anonymous',
+      user_name: sender?.full_name || sender?.username || `User_${message.sender_id?.slice(0, 8)}`,
       user_avatar: sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sender?.username || 'User')}&background=B11D2D&color=fff`,
       user_vip_tier: sender?.vip_tier,
       message: message.content,
       created_at: message.created_at,
-      is_gift: message.message_type === 'gift'
+      is_gift: message.message_type === 'gift',
+      is_dating_interest: message.message_type === 'dating_interest'
     };
 
     setComments(prev => [...prev, newComment]);
@@ -852,6 +813,52 @@ const Live = () => {
       setIsVideoOff(videoTracks.length === 0);
       setIsMuted(audioTracks.length === 0);
 
+      // Capture thumbnail from video stream and upload to Cloudinary
+      let thumbnailUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email?.split('@')[0] || 'Live')}&size=400&background=B11D2D&color=fff&format=png`;
+      
+      if (videoTracks.length > 0) {
+        try {
+          // Create video element to capture frame
+          const video = document.createElement('video');
+          video.srcObject = stream;
+          video.muted = true;
+          video.playsInline = true;
+          
+          await new Promise((resolve) => {
+            video.onloadedmetadata = resolve;
+          });
+          
+          await video.play();
+          
+          // Create canvas to capture frame
+          const canvas = document.createElement('canvas');
+          canvas.width = 640;
+          canvas.height = 360;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            // Draw video frame to canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Convert canvas to blob
+            const blob = await new Promise<Blob>((resolve) => {
+              canvas.toBlob(resolve, 'image/jpeg', 0.8);
+            });
+            
+            // Upload to Cloudinary
+            const file = new File([blob], `stream-thumbnail-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            const uploadResult = await uploadToCloudinary(file, 'live_rooms');
+            thumbnailUrl = uploadResult.url;
+          }
+          
+          video.pause();
+          video.srcObject = null;
+        } catch (error) {
+          console.error('Failed to capture thumbnail:', error);
+          // Fall back to generated avatar
+        }
+      }
+
       const { data: room, error } = await supabase
         .from('live_rooms')
         .insert({
@@ -862,7 +869,10 @@ const Live = () => {
           max_viewers: maxViewers,
           cost_per_minute: streamType === 'private' ? costPerMinute : null,
           is_active: true,
-          viewer_count: 1
+          viewer_count: 1,
+          category: streamCategory,
+          dating_focus: streamCategory,
+          thumbnail_url: thumbnailUrl
         })
         .select()
         .single();
@@ -887,12 +897,12 @@ const Live = () => {
       const newStream: LiveStream = {
         id: room.id,
         host_id: user.id,
-        host_name: user.email?.split('@')[0] || 'Anonymous',
+        host_name: user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0] || `User_${user.id?.slice(0, 8)}`,
         host_username: user.email?.split('@')[0] || '',
         host_avatar: user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email?.split('@')[0] || 'User')}&background=B11D2D&color=fff`,
         title: streamTitle || `${user.email?.split('@')[0]}'s Stream`,
         category: streamCategory,
-        thumbnail_url: 'https://images.unsplash.com/photo-1471471886143-281d93bce7e?w=400&h=300&fit=crop',
+        thumbnail_url: thumbnailUrl,
         viewer_count: 1,
         is_active: true,
         started_at: new Date(),
@@ -1005,26 +1015,6 @@ const Live = () => {
     }
   };
 
-  const handleToggleVideo = () => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
-      }
-    }
-  };
-
-  const handleToggleAudio = () => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
-      }
-    }
-  };
-
   const handleSendComment = async () => {
     if (!newComment.trim() || !selectedStream || !user) return;
 
@@ -1058,13 +1048,11 @@ const Live = () => {
         return;
       }
 
-      // Deduct coins
       await supabase
         .from('profiles')
         .update({ coins_balance: profile.coins_balance - gift.cost_coins })
         .eq('id', user.id);
 
-      // Add to host (90%)
       const { data: hostProfile } = await supabase
         .from('profiles')
         .select('coins_balance')
@@ -1078,13 +1066,11 @@ const Live = () => {
           .eq('id', selectedStream.host_id);
       }
 
-      // Record transactions
       await supabase.from('coin_transactions').insert([
         { user_id: user.id, amount: -gift.cost_coins, type: 'gift_sent', description: `Sent ${gift.name} to ${selectedStream.host_name}` },
         { user_id: selectedStream.host_id, amount: Math.floor(gift.cost_coins * 0.9), type: 'gift_received', description: `Received ${gift.name} from ${user.email?.split('@')[0]}` }
       ]);
 
-      // Send gift message
       await supabase.from('messages').insert({
         room_id: selectedStream.id,
         sender_id: user.id,
@@ -1095,7 +1081,7 @@ const Live = () => {
       // Show animation
       const giftElement = document.createElement('div');
       giftElement.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
-      giftElement.innerHTML = `<div class="text-9xl animate-bounce">${gift.icon_url || '🎁'}</div>`;
+      giftElement.innerHTML = `<div class="text-7xl sm:text-9xl animate-bounce">${gift.icon_url || '🎁'}</div>`;
       document.body.appendChild(giftElement);
       setTimeout(() => giftElement.remove(), 2000);
 
@@ -1106,40 +1092,75 @@ const Live = () => {
     }
   };
 
-  const handleReply = (comment: LiveComment) => {
-    setReplyToComment(comment);
-    setNewComment(`@${comment.user_name} `);
+  const handleDatingInterest = async () => {
+    if (!selectedStream || !user) return;
+    
+    await supabase.from('messages').insert({ 
+      room_id: selectedStream.id, 
+      sender_id: user.id, 
+      content: '💕 Interested in dating!', 
+      message_type: 'dating_interest' 
+    });
+    
+    // Update participant interest status
+    setParticipants(prev => prev.map(p => 
+      p.user_id === user.id ? { ...p, is_interested: true } : p
+    ));
+    
+    const heartElement = document.createElement('div');
+    heartElement.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
+    heartElement.innerHTML = `
+      <div class="text-center">
+        <div class="text-7xl sm:text-9xl animate-bounce">💕</div>
+        <div class="text-white text-base sm:text-xl mt-4 font-bold animate-pulse bg-black/50 px-4 py-2 rounded-full">
+          Interest Sent!
+        </div>
+      </div>
+    `;
+    document.body.appendChild(heartElement);
+    setTimeout(() => heartElement.remove(), 2000);
   };
 
-  const handleEmoteClick = (emote: string) => {
-    setNewComment(prev => prev + ' ' + emote);
-  };
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
+  const handleSendMatchRequest = async (targetUserId: string) => {
+    if (!user || !selectedStream) return;
+    
+    try {
+      const { data: existingMatch } = await supabase
+        .from('stream_matches')
+        .select('*')
+        .or(`and(user1_id.eq.${user.id},user2_id.eq.${targetUserId}),and(user1_id.eq.${targetUserId},user2_id.eq.${user.id})`)
+        .single();
+      
+      if (existingMatch) {
+        toast({ title: 'Match Already Exists', description: 'You already have a match request with this user.' });
+        return;
+      }
+      
+      await supabase.from('stream_matches').insert({
+        stream_id: selectedStream.id,
+        user1_id: user.id,
+        user2_id: targetUserId
+      });
+      
+      toast({ title: 'Match Request Sent!', description: 'Your interest has been sent.' });
+    } catch (error) {
+      console.error('Error sending match request:', error);
+      toast({ title: 'Error', description: 'Failed to send match request.', variant: 'destructive' });
     }
-  };
-
-  const toggleChatMinimize = () => setChatSettings(prev => ({ ...prev, isMinimized: !prev.isMinimized }));
-  const toggleChatPin = () => setChatSettings(prev => ({ ...prev, isPinned: !prev.isPinned }));
-  const handleDragStart = () => setIsDragging(true);
-  const handleDragStop = (data: any) => {
-    setIsDragging(false);
-    setChatSettings(prev => ({ ...prev, position: { x: data.x, y: data.y } }));
   };
 
   const handleLike = async () => {
     if (!selectedStream || !user) return;
-    await supabase.from('messages').insert({ room_id: selectedStream.id, sender_id: user.id, content: '❤️', message_type: 'text' });
+    await supabase.from('messages').insert({ 
+      room_id: selectedStream.id, 
+      sender_id: user.id, 
+      content: '❤️', 
+      message_type: 'text' 
+    });
     
     const heartElement = document.createElement('div');
     heartElement.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
-    heartElement.innerHTML = '<div class="text-9xl animate-ping">❤️</div>';
+    heartElement.innerHTML = '<div class="text-7xl sm:text-9xl animate-ping">❤️</div>';
     document.body.appendChild(heartElement);
     setTimeout(() => heartElement.remove(), 1000);
   };
@@ -1147,23 +1168,32 @@ const Live = () => {
   const handleShare = () => {
     const streamUrl = `${window.location.origin}/live?stream=${selectedStream?.id}`;
     if (navigator.share) {
-      navigator.share({ title: `${selectedStream?.host_name}'s Live Stream`, url: streamUrl })
-        .catch(() => navigator.clipboard.writeText(streamUrl));
+      navigator.share({ 
+        title: `${selectedStream?.host_name}'s Live Stream`, 
+        url: streamUrl 
+      }).catch(() => {
+        navigator.clipboard.writeText(streamUrl);
+        toast({ title: 'Link Copied!', description: 'Stream link copied to clipboard.' });
+      });
     } else {
       navigator.clipboard.writeText(streamUrl);
       toast({ title: 'Link Copied!', description: 'Stream link copied to clipboard.' });
     }
   };
 
-  const handleThumbsUp = async () => {
-    if (!selectedStream || !user) return;
-    await supabase.from('messages').insert({ room_id: selectedStream.id, sender_id: user.id, content: '👍 Great stream!', message_type: 'text' });
-    
-    const thumbsElement = document.createElement('div');
-    thumbsElement.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
-    thumbsElement.innerHTML = '<div class="text-9xl animate-bounce">👍</div>';
-    document.body.appendChild(thumbsElement);
-    setTimeout(() => thumbsElement.remove(), 1000);
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement && videoContainerRef.current) {
+      videoContainerRef.current.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  const rotateSpeedDatingParticipants = () => {
+    // Implement speed dating rotation logic
+    addSystemMessage('🔄 Rotating participants... Find your next conversation!');
   };
 
   const formatDuration = (seconds: number) => {
@@ -1182,12 +1212,8 @@ const Live = () => {
 
   const getCountryFlag = (country: string = '') => {
     const flags: Record<string, string> = {
-      'RW': '🇷🇼', 'Rwanda': '🇷🇼',
-      'KE': '🇰🇪', 'Kenya': '🇰🇪',
-      'UG': '🇺🇬', 'Uganda': '🇺🇬',
-      'TZ': '🇹🇿', 'Tanzania': '🇹🇿',
-      'BI': '🇧🇮', 'Burundi': '🇧🇮',
-      'CD': '🇨🇩', 'Congo': '🇨🇩'
+      'US': '🇺🇸', 'UK': '🇬🇧', 'CA': '🇨🇦', 'AU': '🇦🇺',
+      'RW': '🇷🇼', 'KE': '🇰🇪', 'UG': '🇺🇬', 'TZ': '🇹🇿'
     };
     return flags[country] || '🌍';
   };
@@ -1216,127 +1242,340 @@ const Live = () => {
 
   if (!user) return null;
 
-  // Live Stream Player View
+  // Live Stream Player View (Mobile-First)
   if (selectedStream) {
     return (
       <AuthGuard>
-        <div className="h-screen bg-black relative overflow-hidden">
-          {/* Live Stream Player */}
-          <div className="absolute inset-0 bg-black">
-            {isHost && localStream ? (
-              <video
-                ref={(el) => setVideoRef(el)}
-                autoPlay
-                muted={isMuted}
-                className="w-full h-full object-contain bg-black"
-              />
-            ) : (
-              <LiveThumbnail
-                streamId={selectedStream.id}
-                isActive={selectedStream.is_active}
-                className="w-full h-full object-cover"
-              />
-            )}
-          </div>
+        <div className="h-screen bg-black relative overflow-hidden flex flex-col">
+          {/* Video Container */}
+          <div 
+            ref={videoContainerRef}
+            className="relative flex-1 bg-black"
+          >
+            {/* Video Player */}
+            <div className="absolute inset-0">
+              {isHost && localStream ? (
+                <video
+                  ref={(el) => setVideoRef(el)}
+                  autoPlay
+                  playsInline
+                  muted={isMuted}
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <LiveThumbnail
+                  stream={selectedStream}
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
 
-          {/* Overlay Gradient */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
+            {/* Gradient Overlays */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent pointer-events-none" />
 
-          {/* Top Bar */}
-          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
+            {/* Top Bar */}
+            <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between z-10">
+              <div className="flex items-center gap-2">
                 <Button
                   onClick={handleLeaveStream}
                   variant="ghost"
                   size="sm"
-                  className="text-white hover:bg-white/20 rounded-full"
+                  className="text-white hover:bg-white/20 rounded-full w-8 h-8 p-0"
                 >
-                  <ChevronRight className="w-5 h-5 rotate-180" />
+                  <ChevronLeft className="w-5 h-5" />
                 </Button>
 
-                <div className="flex items-center gap-3">
-                  <Avatar className="w-10 h-10 ring-2 ring-rose-500">
+                <div className="flex items-center gap-2">
+                  <Avatar className="w-8 h-8 ring-2 ring-rose-500">
                     <AvatarImage src={selectedStream.host_avatar} />
-                    <AvatarFallback>{selectedStream.host_name[0]}</AvatarFallback>
+                    <AvatarFallback className="text-xs">{selectedStream.host_name[0]}</AvatarFallback>
                   </Avatar>
-                  <div className="hidden sm:block">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-white font-semibold">{selectedStream.host_name}</h2>
-                      {selectedStream.host_verified && (
-                        <Badge className="bg-emerald-600 text-white text-xs">Verified</Badge>
-                      )}
-                      {selectedStream.host_vip_tier !== 'free' && (
-                        <Badge className={`bg-gradient-to-r ${getTierColor(selectedStream.host_vip_tier)} text-black text-xs`}>
-                          <Crown className="w-3 h-3 mr-1" />
-                          {selectedStream.host_vip_tier}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-white/80 text-sm line-clamp-1">{selectedStream.title}</p>
+                  <div>
+                    <h2 className="text-white text-sm font-semibold">{selectedStream.host_name}</h2>
+                    <p className="text-white/60 text-xs line-clamp-1 max-w-[120px]">{selectedStream.title}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 ml-auto">
-                {/* Room Type */}
-                <div className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm text-white">
-                  {getRoomTypeIcon(selectedStream.room_type)}
-                  <span className="text-sm capitalize">{selectedStream.room_type.replace('_', ' ')}</span>
+              <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm">
+                  <Eye className="w-3 h-3 text-white" />
+                  <span className="text-white text-xs">{viewerCount}</span>
                 </div>
-
-                {/* Live Badge */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-600">
-                  <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                  <span className="text-white text-sm font-medium hidden sm:inline">LIVE</span>
+                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-rose-600">
+                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                  <span className="text-white text-xs font-medium">LIVE</span>
                 </div>
-
-                {/* Viewer Count */}
-                <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm text-white">
-                  <Eye className="w-4 h-4" />
-                  <span className="text-sm font-medium">{viewerCount}</span>
-                </div>
-
-                {/* Duration */}
-                <div className="hidden md:flex items-center gap-1 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm text-white">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-sm">{formatDuration(streamDuration)}</span>
-                </div>
-
-                {/* Fullscreen */}
                 <Button
                   onClick={toggleFullscreen}
                   variant="ghost"
                   size="sm"
-                  className="text-white hover:bg-white/20 rounded-full"
+                  className="text-white hover:bg-white/20 rounded-full w-8 h-8 p-0"
                 >
-                  {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                  <Maximize2 className="w-4 h-4" />
                 </Button>
               </div>
             </div>
+
+            {/* Speed Dating Timer */}
+            {selectedStream.room_type === 'speed_dating' && (
+              <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-black/70 backdrop-blur-sm rounded-full px-3 py-1.5 border border-white/10">
+                <div className="flex items-center gap-1 text-white text-xs">
+                  <Clock className="w-3 h-3 text-rose-400" />
+                  <span>Next: {Math.floor(speedDatingTimer / 60)}:{String(speedDatingTimer % 60).padStart(2, '0')}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Host Info (Mobile) */}
+            <Button
+              onClick={() => setShowProfileCard(true)}
+              variant="ghost"
+              size="sm"
+              className="absolute left-3 top-20 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-white text-xs flex items-center gap-1"
+            >
+              <User className="w-3 h-3" />
+              About Host
+            </Button>
+
+            {/* Participants Button */}
+            <Button
+              onClick={() => setShowParticipants(true)}
+              variant="ghost"
+              size="sm"
+              className="absolute right-3 top-20 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5 text-white text-xs flex items-center gap-1"
+            >
+              <Users className="w-3 h-3" />
+              {participants.length}
+            </Button>
+
+            {/* Bottom Controls */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {isHost ? (
+                    <>
+                      <Button
+                        onClick={handleToggleVideo}
+                        variant="ghost"
+                        size="sm"
+                        className={`w-10 h-10 rounded-full ${
+                          isVideoOff ? 'bg-rose-600' : 'bg-white/20'
+                        } text-white`}
+                      >
+                        {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                      </Button>
+                      <Button
+                        onClick={handleToggleAudio}
+                        variant="ghost"
+                        size="sm"
+                        className={`w-10 h-10 rounded-full ${
+                          isMuted ? 'bg-rose-600' : 'bg-white/20'
+                        } text-white`}
+                      >
+                        {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={handleDatingInterest}
+                      variant="ghost"
+                      size="sm"
+                      className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white"
+                    >
+                      <Heart className="w-5 h-5" />
+                    </Button>
+                  )}
+
+                  <Button
+                    onClick={() => setShowGiftMenu(true)}
+                    variant="ghost"
+                    size="sm"
+                    className="w-10 h-10 rounded-full bg-white/20 text-white"
+                  >
+                    <Gift className="w-5 h-5" />
+                  </Button>
+
+                  <Button
+                    onClick={handleLike}
+                    variant="ghost"
+                    size="sm"
+                    className="w-10 h-10 rounded-full bg-white/20 text-white"
+                  >
+                    <ThumbsUp className="w-5 h-5" />
+                  </Button>
+
+                  <Button
+                    onClick={() => setShowIcebreakers(true)}
+                    variant="ghost"
+                    size="sm"
+                    className="w-10 h-10 rounded-full bg-white/20 text-white"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                <Button
+                  onClick={() => setIsChatVisible(!isChatVisible)}
+                  variant="ghost"
+                  size="sm"
+                  className="px-3 py-2 rounded-full bg-white/20 text-white flex items-center gap-1"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span className="text-xs">{comments.length}</span>
+                </Button>
+              </div>
+
+              {isHost && (
+                <Button
+                  onClick={handleStopLive}
+                  className="mt-2 w-full bg-rose-600 text-white text-sm py-2 rounded-full"
+                >
+                  End Stream
+                </Button>
+              )}
+            </div>
           </div>
+
+          {/* Chat Panel (Mobile) */}
+          <AnimatePresence>
+            {isChatVisible && (
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25 }}
+                className="absolute bottom-0 left-0 right-0 h-2/3 bg-gray-900 rounded-t-2xl border-t border-white/10 flex flex-col z-20"
+              >
+                <div className="p-3 border-b border-white/10 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-white font-medium">Live Chat</h3>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-white/60 text-xs">{viewerCount}</span>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => setIsChatVisible(false)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-white/60 hover:text-white"
+                  >
+                    <ChevronDown className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                <div 
+                  ref={chatContainerRef}
+                  className="flex-1 overflow-y-auto p-3 space-y-3"
+                >
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="flex items-start gap-2">
+                      <Avatar className="w-6 h-6 flex-shrink-0">
+                        <AvatarImage src={comment.user_avatar} />
+                        <AvatarFallback className="text-xs">{comment.user_name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-white font-medium text-xs">{comment.user_name}</span>
+                          {comment.user_vip_tier && comment.user_vip_tier !== 'free' && (
+                            <Crown className="w-3 h-3 text-amber-500" />
+                          )}
+                          <span className="text-white/40 text-xs">{formatTime(comment.created_at)}</span>
+                        </div>
+                        <p className={cn(
+                          "text-sm break-words",
+                          comment.is_system ? 'text-purple-400' : 
+                          comment.is_gift ? 'text-amber-400' : 
+                          comment.is_dating_interest ? 'text-pink-400' : 'text-white/90'
+                        )}>
+                          {comment.message}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={commentsEndRef} />
+                </div>
+
+                <div className="p-3 border-t border-white/10">
+                  {replyToComment && (
+                    <div className="flex items-center justify-between bg-purple-900/30 p-2 rounded-lg mb-2">
+                      <span className="text-xs text-white/80">
+                        Replying to @{replyToComment.user_name}
+                      </span>
+                      <Button onClick={() => setReplyToComment(null)} variant="ghost" size="sm" className="h-5 w-5 p-0">
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
+                      placeholder="Type a message..."
+                      className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-10"
+                    />
+                    <Button
+                      onClick={handleSendComment}
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700 text-white h-10 w-10 p-0"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Participants Panel */}
           <AnimatePresence>
             {showParticipants && (
               <motion.div
-                initial={{ x: 300 }}
+                initial={{ x: "100%" }}
                 animate={{ x: 0 }}
-                exit={{ x: 300 }}
-                className="absolute top-20 right-4 w-64 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 overflow-hidden z-40"
+                exit={{ x: "100%" }}
+                className="absolute inset-0 bg-gray-900 z-30 flex flex-col"
               >
-                <div className="p-3 border-b border-white/10 flex items-center justify-between">
-                  <h3 className="text-white font-medium">Viewers ({viewerCount})</h3>
-                  <Button onClick={() => setShowParticipants(false)} variant="ghost" size="sm" className="text-white hover:bg-white/20">
-                    <X className="w-4 h-4" />
+                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                  <h3 className="text-white font-semibold">Viewers ({viewerCount})</h3>
+                  <Button onClick={() => setShowParticipants(false)} variant="ghost" size="sm" className="text-white">
+                    <X className="w-5 h-5" />
                   </Button>
                 </div>
-                <div className="p-2 max-h-96 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto p-4">
                   {participants.map(p => (
-                    <div key={p.id} className="flex items-center gap-2 p-2 hover:bg-white/5 rounded-lg">
-                      <ParticipantAvatar participant={p} size="sm" />
-                      <span className="text-white text-sm flex-1">{p.user_name}</span>
-                      {p.is_host && <Star className="w-3 h-3 text-amber-500" />}
+                    <div 
+                      key={p.id} 
+                      className="flex items-center gap-3 p-3 hover:bg-white/5 rounded-lg cursor-pointer"
+                      onClick={() => {
+                        setSelectedParticipant(p);
+                        setShowParticipants(false);
+                      }}
+                    >
+                      <ParticipantAvatar participant={p} size="md" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium">{p.user_name}</span>
+                          {p.is_host && <Star className="w-3 h-3 text-amber-500" />}
+                          {p.is_interested && <Heart className="w-3 h-3 text-rose-500" />}
+                        </div>
+                        {p.age && <p className="text-white/60 text-xs">Age {p.age}</p>}
+                      </div>
+                      {!p.is_host && p.user_id !== user.id && (
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSendMatchRequest(p.user_id);
+                          }}
+                          size="sm"
+                          className="bg-rose-500 text-white text-xs px-3 py-1 rounded-full"
+                        >
+                          Match
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1344,325 +1583,114 @@ const Live = () => {
             )}
           </AnimatePresence>
 
-          {/* Bottom Controls */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                {isHost && (
-                  <>
-                    <Button
-                      onClick={handleToggleVideo}
-                      variant="ghost"
-                      size="sm"
-                      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${
-                        isVideoOff ? 'bg-rose-600 text-white' : 'bg-white/20 text-white'
-                      } hover:bg-white/30`}
-                    >
-                      {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-                    </Button>
-                    <Button
-                      onClick={handleToggleAudio}
-                      variant="ghost"
-                      size="sm"
-                      className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full ${
-                        isMuted ? 'bg-rose-600 text-white' : 'bg-white/20 text-white'
-                      } hover:bg-white/30`}
-                    >
-                      {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                    </Button>
-                  </>
-                )}
-
-                <Button
-                  onClick={() => setShowGiftMenu(true)}
-                  variant="ghost"
-                  size="sm"
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 text-white hover:bg-white/30 relative"
+          {/* Profile Card */}
+          <AnimatePresence>
+            {showProfileCard && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-black/80 z-30 flex items-center justify-center p-4"
+                onClick={() => setShowProfileCard(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0.9 }}
+                  className="bg-gray-900 rounded-2xl p-6 max-w-sm w-full"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Gift className="w-5 h-5" />
-                </Button>
+                  <div className="text-center mb-4">
+                    <Avatar className="w-20 h-20 mx-auto mb-3 ring-4 ring-rose-500">
+                      <AvatarImage src={selectedStream.host_avatar} />
+                      <AvatarFallback className="text-2xl">{selectedStream.host_name[0]}</AvatarFallback>
+                    </Avatar>
+                    <h3 className="text-white font-semibold text-lg">{selectedStream.host_name}</h3>
+                    {selectedStream.age && (
+                      <p className="text-white/60 text-sm">Age {selectedStream.age}</p>
+                    )}
+                  </div>
 
-                <Button
-                  onClick={handleLike}
-                  variant="ghost"
-                  size="sm"
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 text-white hover:bg-white/30"
-                >
-                  <Heart className="w-5 h-5" />
-                </Button>
+                  <div className="space-y-3 mb-4">
+                    {selectedStream.city && (
+                      <div className="flex items-center gap-2 text-white/80 text-sm">
+                        <MapPin className="w-4 h-4" />
+                        <span>{getCountryFlag(selectedStream.country)} {selectedStream.city}</span>
+                      </div>
+                    )}
+                    
+                    <p className="text-white/80 text-sm">{selectedStream.bio || 'No bio yet'}</p>
 
-                <Button
-                  onClick={handleShare}
-                  variant="ghost"
-                  size="sm"
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 text-white hover:bg-white/30"
-                >
-                  <Share2 className="w-5 h-5" />
-                </Button>
+                    {!isHost && (
+                      <>
+                        <div className="pt-2">
+                          <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="text-white/80">Match Compatibility</span>
+                            <span className="text-rose-400 font-semibold">85%</span>
+                          </div>
+                          <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                            <div className="w-[85%] h-full bg-gradient-to-r from-rose-500 to-purple-500" />
+                          </div>
+                        </div>
 
-                <Button
-                  onClick={() => setShowParticipants(!showParticipants)}
-                  variant="ghost"
-                  size="sm"
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 text-white hover:bg-white/30"
-                >
-                  <Users className="w-5 h-5" />
-                </Button>
+                        <Button
+                          onClick={() => {
+                            handleSendMatchRequest(selectedStream.host_id);
+                            setShowProfileCard(false);
+                          }}
+                          className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl"
+                        >
+                          <Heart className="w-4 h-4 mr-2" />
+                          Send Match Request
+                        </Button>
+                      </>
+                    )}
+                  </div>
 
-                {isHost && (
                   <Button
-                    onClick={handleStopLive}
-                    className="px-3 py-2 sm:px-4 sm:py-2 rounded-full bg-rose-600 text-white hover:bg-rose-700 text-sm sm:text-base"
+                    onClick={() => setShowProfileCard(false)}
+                    variant="outline"
+                    className="w-full border-white/10 text-white hover:bg-white/10"
                   >
-                    End
+                    Close
                   </Button>
-                )}
-              </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              {/* Chat Toggle */}
-              <Button
-                onClick={() => setIsChatVisible(!isChatVisible)}
-                variant="ghost"
-                size="sm"
-                className="px-3 py-2 sm:px-4 sm:py-2 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center gap-2"
+          {/* Icebreakers Menu */}
+          <AnimatePresence>
+            {showIcebreakers && (
+              <motion.div
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className="absolute bottom-24 left-4 right-4 bg-gray-900 rounded-2xl border border-white/10 p-4 z-30"
               >
-                <MessageCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">Chat</span>
-                <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">{comments.length}</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* Movable Chat Window */}
-          {isChatVisible && (
-            <DraggableWrapper
-              handle=".chat-drag-handle"
-              position={chatSettings.position}
-              onStart={handleDragStart}
-              onStop={handleDragStop}
-              disabled={chatSettings.isPinned}
-            >
-              <div
-                className={`fixed z-40 transition-shadow ${isDragging ? 'shadow-2xl' : 'shadow-xl'}`}
-                style={{ 
-                  width: chatSettings.isMinimized ? 240 : Math.min(chatSettings.width, window.innerWidth - 20),
-                  height: chatSettings.isMinimized ? 48 : Math.min(chatSettings.height, window.innerHeight - 100),
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  backgroundColor: 'rgba(26, 26, 26, 0.95)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  right: 20,
-                  bottom: 20
-                }}
-              >
-                {/* Chat Header */}
-                <div 
-                  className={`chat-drag-handle flex items-center justify-between px-3 py-2 border-b border-white/10 cursor-move ${isDragging ? 'bg-purple-900/50' : 'hover:bg-white/5'}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Move className="w-4 h-4 text-white/60" />
-                    <h3 className="text-white font-medium text-sm">Live Chat</h3>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span className="text-white/60 text-xs">{viewerCount}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1">
-                    <Button onClick={toggleChatPin} variant="ghost" size="sm" className="h-6 w-6 text-white/60 hover:text-white">
-                      {chatSettings.isPinned ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
-                    </Button>
-                    <Button onClick={() => setShowSettings(!showSettings)} variant="ghost" size="sm" className="h-6 w-6 text-white/60 hover:text-white">
-                      <Settings className="w-3 h-3" />
-                    </Button>
-                    <Button onClick={toggleChatMinimize} variant="ghost" size="sm" className="h-6 w-6 text-white/60 hover:text-white">
-                      {chatSettings.isMinimized ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    </Button>
-                  </div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-semibold">Icebreaker Questions</h3>
+                  <Button onClick={() => setShowIcebreakers(false)} variant="ghost" size="sm" className="text-white/60">
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
-
-                {/* Chat Settings */}
-                {showSettings && (
-                  <div className="p-3 border-b border-white/10 bg-black/50">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-white/80">Font Size</span>
-                        <div className="flex gap-1">
-                          {(['sm', 'base', 'lg'] as const).map((size) => (
-                            <Button
-                              key={size}
-                              onClick={() => setChatSettings(prev => ({ ...prev, fontSize: size }))}
-                              variant="ghost"
-                              size="sm"
-                              className={`h-6 px-2 text-xs ${
-                                chatSettings.fontSize === size ? 'bg-purple-600 text-white' : 'text-white/60 hover:text-white'
-                              }`}
-                            >
-                              {size.toUpperCase()}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-white/80">Timestamps</span>
-                        <input
-                          type="checkbox"
-                          checked={chatSettings.showTimestamps}
-                          onChange={(e) => setChatSettings(prev => ({ ...prev, showTimestamps: e.target.checked }))}
-                          className="rounded"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-white/80">Avatars</span>
-                        <input
-                          type="checkbox"
-                          checked={chatSettings.showAvatars}
-                          onChange={(e) => setChatSettings(prev => ({ ...prev, showAvatars: e.target.checked }))}
-                          className="rounded"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Chat Messages */}
-                {!chatSettings.isMinimized && (
-                  <>
-                    <div 
-                      ref={chatContainerRef}
-                      className="flex-1 overflow-y-auto p-3 space-y-3"
-                      style={{ height: `calc(100% - 100px)` }}
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {icebreakerQuestions.map((question) => (
+                    <button
+                      key={question}
+                      onClick={() => {
+                        setNewComment(question);
+                        setShowIcebreakers(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-white/10 rounded-lg text-sm text-white/90"
                     >
-                      {comments.map((comment) => (
-                        <motion.div
-                          key={comment.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`flex items-start gap-2 group ${comment.is_highlighted ? 'bg-purple-900/30 -mx-3 px-3 py-2 rounded-lg' : ''}`}
-                        >
-                          {chatSettings.showAvatars && (
-                            <Avatar className="w-6 h-6 flex-shrink-0">
-                              <AvatarImage src={comment.user_avatar} />
-                              <AvatarFallback className="bg-rose-500 text-white text-xs">{comment.user_name[0]}</AvatarFallback>
-                            </Avatar>
-                          )}
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-white font-medium text-xs">
-                                {comment.user_name}
-                              </span>
-                              {comment.user_vip_tier && comment.user_vip_tier !== 'free' && (
-                                <Crown className="w-3 h-3 text-amber-500" />
-                              )}
-                              {comment.is_gift && (
-                                <Badge className="text-xs bg-amber-500 text-black">Gift</Badge>
-                              )}
-                              {chatSettings.showTimestamps && (
-                                <span className="text-white/40 text-xs">{formatTime(comment.created_at)}</span>
-                              )}
-                            </div>
-                            <p className={`text-sm break-words ${
-                              comment.is_system ? 'text-purple-400' : 
-                              comment.is_gift ? 'text-amber-400' : 'text-white/90'
-                            }`}>
-                              {comment.message}
-                            </p>
-                          </div>
-
-                          <Button
-                            onClick={() => handleReply(comment)}
-                            variant="ghost"
-                            size="sm"
-                            className="opacity-0 group-hover:opacity-100 h-6 w-6 text-white/40 hover:text-white"
-                          >
-                            <MessageCircle className="w-3 h-3" />
-                          </Button>
-                        </motion.div>
-                      ))}
-                      <div ref={commentsEndRef} />
-                    </div>
-
-                    {/* Chat Input */}
-                    <div className="p-3 border-t border-white/10">
-                      {replyToComment && (
-                        <div className="flex items-center justify-between bg-purple-900/30 p-2 rounded-lg mb-2">
-                          <span className="text-xs text-white/80">
-                            Replying to @{replyToComment.user_name}
-                          </span>
-                          <Button onClick={() => setReplyToComment(null)} variant="ghost" size="sm" className="h-4 w-4 text-white/40 hover:text-white">
-                            <X className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => setShowEmotes(!showEmotes)}
-                          variant="ghost"
-                          size="sm"
-                          className="px-2 text-white/60 hover:text-white"
-                        >
-                          😊
-                        </Button>
-                        <Input
-                          value={newComment}
-                          onChange={(e) => setNewComment(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
-                          placeholder="Type a message..."
-                          className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-sm"
-                        />
-                        <Button
-                          onClick={handleSendComment}
-                          size="sm"
-                          className="bg-purple-600 hover:bg-purple-700 text-white"
-                        >
-                          <Send className="w-4 h-4" />
-                        </Button>
-                      </div>
-
-                      {/* Emote Picker */}
-                      {showEmotes && (
-                        <div className="absolute bottom-20 left-3 bg-gray-900 rounded-lg shadow-xl p-2 border border-white/10">
-                          <div className="grid grid-cols-6 gap-1">
-                            {emotes.map((emote) => (
-                              <button
-                                key={emote.name}
-                                onClick={() => { handleEmoteClick(emote.emote); setShowEmotes(false); }}
-                                className="w-8 h-8 hover:bg-white/10 rounded flex items-center justify-center text-lg"
-                              >
-                                {emote.emote}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </DraggableWrapper>
-          )}
-
-          {/* Host Info Overlay */}
-          <div className="absolute left-4 top-24 bg-black/50 backdrop-blur-sm rounded-lg p-3 border border-white/10 max-w-xs hidden lg:block">
-            <div className="flex items-start gap-3">
-              <Avatar className="w-12 h-12">
-                <AvatarImage src={selectedStream.host_avatar} />
-                <AvatarFallback className="bg-rose-500 text-white">{selectedStream.host_name[0]}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="text-white font-medium mb-1">{selectedStream.host_name}</h3>
-                <p className="text-white/60 text-xs mb-2">{selectedStream.bio || 'No bio yet'}</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedStream.tags?.map((tag) => (
-                    <Badge key={tag} className="text-xs bg-white/10 text-white">#{tag}</Badge>
+                      {question}
+                    </button>
                   ))}
                 </div>
-              </div>
-            </div>
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Gift Menu Modal */}
           <AnimatePresence>
@@ -1671,12 +1699,71 @@ const Live = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+                className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-50"
                 onClick={() => setShowGiftMenu(false)}
               >
-                <div onClick={(e) => e.stopPropagation()}>
+                <div onClick={(e) => e.stopPropagation()} className="w-full">
                   <GiftInventory onSendGift={handleSendGift} onClose={() => setShowGiftMenu(false)} />
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Participant Profile Modal */}
+          <AnimatePresence>
+            {selectedParticipant && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+                onClick={() => setSelectedParticipant(null)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0.9 }}
+                  className="bg-gray-900 rounded-2xl p-6 max-w-sm w-full"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="text-center mb-4">
+                    <Avatar className="w-20 h-20 mx-auto mb-3 ring-4 ring-rose-500">
+                      <AvatarImage src={selectedParticipant.user_avatar} />
+                      <AvatarFallback className="text-2xl">{selectedParticipant.user_name[0]}</AvatarFallback>
+                    </Avatar>
+                    <h3 className="text-white font-semibold text-lg">{selectedParticipant.user_name}</h3>
+                    {selectedParticipant.age && (
+                      <p className="text-white/60 text-sm">Age {selectedParticipant.age}</p>
+                    )}
+                  </div>
+
+                  {selectedParticipant.relationship_intention && (
+                    <div className="mb-4">
+                      <p className="text-white/80 text-sm text-center">{selectedParticipant.relationship_intention}</p>
+                    </div>
+                  )}
+
+                  {selectedParticipant.user_id !== user.id && !selectedParticipant.is_host && (
+                    <Button
+                      onClick={() => {
+                        handleSendMatchRequest(selectedParticipant.user_id);
+                        setSelectedParticipant(null);
+                      }}
+                      className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 rounded-xl mb-2"
+                    >
+                      <Heart className="w-4 h-4 mr-2" />
+                      Send Match Request
+                    </Button>
+                  )}
+
+                  <Button
+                    onClick={() => setSelectedParticipant(null)}
+                    variant="outline"
+                    className="w-full border-white/10 text-white hover:bg-white/10"
+                  >
+                    Close
+                  </Button>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -1685,15 +1772,15 @@ const Live = () => {
     );
   }
 
-  // Live Streams Grid View
+  // Live Streams Grid View (Mobile-First)
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-rose-950/20">
+      <div className="min-h-screen bg-gradient-to-b from-rose-50 to-purple-50 dark:from-gray-900 dark:to-gray-950">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-rose-200 dark:border-rose-900/30">
-          <div className="container mx-auto px-4 py-4">
+          <div className="px-4 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
                 <Button
                   onClick={() => navigate('/dashboard')}
                   variant="ghost"
@@ -1702,118 +1789,84 @@ const Live = () => {
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </Button>
-                <motion.div initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
-                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-rose-600 to-purple-600 bg-clip-text text-transparent">
-                    Live Streams
+                <div>
+                  <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-rose-600 to-purple-600 bg-clip-text text-transparent">
+                    Live Dating
                   </h1>
-                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    Connect with others in real-time
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Connect in real-time
                   </p>
-                </motion.div>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Button
                   onClick={() => setShowGoLive(true)}
-                  className="bg-gradient-to-r from-rose-500 to-purple-500 text-white hover:from-rose-600 hover:to-purple-600"
-                  size="sm"
+                  className="bg-gradient-to-r from-rose-500 to-purple-500 text-white text-sm h-9 px-3"
                 >
-                  <Video className="w-4 h-4 mr-2" />
+                  <Video className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Go Live</span>
                 </Button>
-                <Link to="/dashboard">
-                  <Button variant="outline" size="sm" className="hidden sm:inline-flex border-rose-200 dark:border-rose-800">
-                    Dashboard
-                  </Button>
-                </Link>
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="sm" className="lg:hidden">
-                      <Menu className="w-5 h-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="bg-white dark:bg-gray-900">
-                    <SheetHeader>
-                      <SheetTitle>Menu</SheetTitle>
-                    </SheetHeader>
-                    <div className="mt-4 space-y-2">
-                      <Link to="/matching" className="block">
-                        <Button variant="ghost" className="w-full justify-start">Matching</Button>
-                      </Link>
-                      <Link to="/search" className="block">
-                        <Button variant="ghost" className="w-full justify-start">Discover</Button>
-                      </Link>
-                      <Link to="/gifts" className="block">
-                        <Button variant="ghost" className="w-full justify-start">Gifts</Button>
-                      </Link>
-                      <Link to="/wallet" className="block">
-                        <Button variant="ghost" className="w-full justify-start">Wallet</Button>
-                      </Link>
-                      <Link to="/notifications" className="block">
-                        <Button variant="ghost" className="w-full justify-start">Notifications</Button>
-                      </Link>
-                      <Link to="/settings" className="block">
-                        <Button variant="ghost" className="w-full justify-start">Settings</Button>
-                      </Link>
-                    </div>
-                  </SheetContent>
-                </Sheet>
+                <Button
+                  onClick={() => setShowMobileMenu(true)}
+                  variant="ghost"
+                  size="sm"
+                  className="lg:hidden"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
               </div>
+            </div>
+
+            {/* Categories */}
+            <div className="flex gap-2 overflow-x-auto mt-3 pb-1 scrollbar-hide">
+              {categories.map((category) => (
+                <Button
+                  key={category.value}
+                  onClick={() => setSelectedCategory(category.value)}
+                  variant={selectedCategory === category.value ? 'default' : 'outline'}
+                  size="sm"
+                  className={cn(
+                    "whitespace-nowrap flex items-center gap-1 rounded-full px-3 py-1.5 text-xs",
+                    selectedCategory === category.value
+                      ? 'bg-gradient-to-r from-rose-500 to-purple-500 text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                  )}
+                >
+                  {category.icon}
+                  <span className="hidden xs:inline">{category.label}</span>
+                </Button>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="container mx-auto px-4 py-6">
-          {/* Categories */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="flex gap-2 overflow-x-auto pb-4 mb-6 scrollbar-hide"
-          >
-            {categories.map((category) => (
-              <Button
-                key={category.value}
-                onClick={() => setSelectedCategory(category.value)}
-                variant={selectedCategory === category.value ? 'default' : 'outline'}
-                size="sm"
-                className={`whitespace-nowrap flex items-center gap-2 rounded-full px-4 ${
-                  selectedCategory === category.value
-                    ? 'bg-gradient-to-r from-rose-500 to-purple-500 text-white'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
-                }`}
-              >
-                {category.icon}
-                <span className="hidden sm:inline">{category.label}</span>
-              </Button>
-            ))}
-          </motion.div>
-
+        <div className="px-4 py-4">
           {/* New Stream Notification */}
           <AnimatePresence>
             {newStreamNotification && (
               <motion.div
-                initial={{ opacity: 0, y: -50, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -50, scale: 0.9 }}
-                className="mb-6"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="mb-4"
               >
                 <div 
-                  className="bg-gradient-to-r from-rose-600 to-purple-600 text-white p-4 rounded-xl shadow-lg cursor-pointer hover:shadow-xl transition-all"
+                  className="bg-gradient-to-r from-rose-600 to-purple-600 text-white p-3 rounded-xl shadow-lg cursor-pointer"
                   onClick={() => handleJoinStream(newStreamNotification)}
                 >
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                       <div>
-                        <div className="font-semibold">🔴 New Stream Started!</div>
-                        <div className="text-sm opacity-90">
-                          {newStreamNotification.host_name} is streaming "{newStreamNotification.title}"
+                        <div className="font-medium text-sm">New Stream Started!</div>
+                        <div className="text-xs opacity-90">
+                          {newStreamNotification.host_name} is live
                         </div>
                       </div>
                     </div>
-                    <Button size="sm" className="bg-white/20 hover:bg-white/30 text-white border-white/30">
-                      Join Now
+                    <Button size="sm" className="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1 h-auto">
+                      Join
                     </Button>
                   </div>
                 </div>
@@ -1825,121 +1878,84 @@ const Live = () => {
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <div className="w-16 h-16 border-4 border-rose-200 border-t-rose-500 rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">Loading live streams...</p>
+                <div className="w-12 h-12 border-4 border-rose-200 border-t-rose-500 rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-sm text-gray-600 dark:text-gray-400">Loading streams...</p>
               </div>
             </div>
           )}
 
           {/* Live Streams Grid */}
           {!loading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+            <div className="space-y-4">
               {filteredStreams.map((stream, index) => (
                 <motion.div
                   key={stream.id}
                   initial={{ y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ y: -4 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
                   onClick={() => handleJoinStream(stream)}
-                  className="cursor-pointer group"
+                  className="cursor-pointer"
                 >
-                  <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden bg-white dark:bg-gray-900">
-                    <div className="relative">
+                  <Card className="border-0 shadow-md overflow-hidden bg-white dark:bg-gray-900">
+                    <div className="flex gap-3">
                       {/* Thumbnail */}
-                      <div className="relative h-40 sm:h-48">
+                      <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
                         <LiveThumbnail
-                          streamId={stream.id}
-                          isActive={stream.is_active}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          stream={stream}
+                          className="w-full h-full object-cover"
                         />
                         
                         {/* Room Type Badge */}
-                        <div className="absolute top-2 left-2">
-                          <Badge className="bg-black/50 backdrop-blur-sm text-white border-white/20">
+                        <div className="absolute top-1 left-1">
+                          <Badge className="bg-black/50 backdrop-blur-sm text-white border-white/20 text-[10px] px-1 py-0">
                             {getRoomTypeIcon(stream.room_type)}
-                            <span className="ml-1 text-xs hidden sm:inline capitalize">{stream.room_type.replace('_', ' ')}</span>
                           </Badge>
                         </div>
 
                         {/* Viewer Count */}
-                        <div className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-xs">
-                          <Eye className="w-3 h-3" />
+                        <div className="absolute bottom-1 right-1 flex items-center gap-0.5 px-1 py-0.5 rounded bg-black/50 backdrop-blur-sm text-white text-[10px]">
+                          <Eye className="w-2.5 h-2.5" />
                           <span>{stream.viewer_count}</span>
-                        </div>
-
-                        {/* Host Info */}
-                        <div className="absolute bottom-2 left-2 flex items-center gap-2">
-                          <Avatar className="w-6 h-6 ring-2 ring-white/50">
-                            <AvatarImage src={stream.host_avatar} />
-                            <AvatarFallback className="bg-rose-500 text-white text-xs">{stream.host_name[0]}</AvatarFallback>
-                          </Avatar>
-                          <div className="bg-black/50 backdrop-blur-sm rounded px-2 py-1">
-                            <p className="text-white text-xs font-medium truncate max-w-16 sm:max-w-20">
-                              {stream.host_name}
-                            </p>
-                          </div>
                         </div>
                       </div>
 
                       {/* Stream Info */}
-                      <CardContent className="p-3 sm:p-4">
-                        <h3 className="font-semibold text-sm sm:text-base mb-1 line-clamp-1 text-gray-900 dark:text-gray-100">
-                          {stream.title}
-                        </h3>
-                        
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge className="text-xs bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-0">
+                      <CardContent className="p-3 flex-1">
+                        <div className="flex items-start justify-between mb-1">
+                          <h3 className="font-semibold text-sm line-clamp-1 text-gray-900 dark:text-gray-100">
+                            {stream.title}
+                          </h3>
+                          <Badge className="text-[10px] bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-0 ml-1">
                             {stream.category}
                           </Badge>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatDuration(Math.floor((Date.now() - new Date(stream.started_at).getTime()) / 1000))}
-                          </span>
                         </div>
 
-                        {/* Tags */}
-                        {stream.tags && stream.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-2">
-                            {stream.tags.slice(0, 2).map((tag) => (
-                              <Badge key={tag} className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-                                #{tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Host Badges */}
                         <div className="flex items-center gap-2 mb-2">
+                          <Avatar className="w-5 h-5">
+                            <AvatarImage src={stream.host_avatar} />
+                            <AvatarFallback className="text-[10px]">{stream.host_name[0]}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-gray-600 dark:text-gray-400">{stream.host_name}</span>
                           {stream.host_verified && (
-                            <div className="flex items-center gap-1">
-                              <Shield className="w-3 h-3 text-emerald-500" />
-                              <span className="text-xs text-emerald-600 dark:text-emerald-400">Verified</span>
-                            </div>
-                          )}
-                          {stream.host_vip_tier !== 'free' && (
-                            <Badge className={`text-xs bg-gradient-to-r ${getTierColor(stream.host_vip_tier)} text-black`}>
-                              <Crown className="w-3 h-3 mr-1" />
-                              {stream.host_vip_tier}
-                            </Badge>
+                            <Shield className="w-3 h-3 text-emerald-500" />
                           )}
                         </div>
 
-                        {/* Location */}
                         {(stream.city || stream.country) && (
-                          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mb-3">
-                            <MapPin className="w-3 h-3" />
+                          <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 mb-2">
+                            <MapPin className="w-2.5 h-2.5" />
                             <span>{getCountryFlag(stream.country)} {stream.city || stream.country}</span>
                           </div>
                         )}
 
-                        {/* Join Button */}
-                        <Button
-                          className="w-full bg-gradient-to-r from-rose-500 to-purple-500 text-white hover:from-rose-600 hover:to-purple-600"
-                          size="sm"
-                        >
-                          Join Stream
-                          <ChevronRight className="w-4 h-4 ml-2" />
-                        </Button>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                            {formatDuration(Math.floor((Date.now() - new Date(stream.started_at).getTime()) / 1000))}
+                          </span>
+                          <Button size="sm" className="h-7 px-3 text-xs bg-gradient-to-r from-rose-500 to-purple-500 text-white">
+                            Join
+                          </Button>
+                        </div>
                       </CardContent>
                     </div>
                   </Card>
@@ -1955,25 +1971,54 @@ const Live = () => {
               animate={{ y: 0, opacity: 1 }}
               className="text-center py-12"
             >
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                <Video className="w-10 h-10 text-gray-400" />
+              <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                <Video className="w-8 h-8 text-gray-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">
+              <h3 className="text-base font-semibold mb-1 text-gray-900 dark:text-gray-100">
                 No live streams
               </h3>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 {selectedCategory === 'all' 
-                  ? 'Check back later for live content'
-                  : `No live streams in ${selectedCategory} category`}
+                  ? 'Check back later'
+                  : `No streams in ${selectedCategory}`}
               </p>
               {selectedCategory !== 'all' && (
-                <Button onClick={() => setSelectedCategory('all')} className="mt-4">
-                  View All Categories
+                <Button onClick={() => setSelectedCategory('all')} size="sm" className="text-sm">
+                  View All
                 </Button>
               )}
             </motion.div>
           )}
         </div>
+
+        {/* Mobile Menu */}
+        <Sheet open={showMobileMenu} onOpenChange={setShowMobileMenu}>
+          <SheetContent side="right" className="bg-white dark:bg-gray-900 w-64">
+            <SheetHeader>
+              <SheetTitle>Menu</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 space-y-2">
+              <Link to="/matching" className="block">
+                <Button variant="ghost" className="w-full justify-start">Matching</Button>
+              </Link>
+              <Link to="/search" className="block">
+                <Button variant="ghost" className="w-full justify-start">Discover</Button>
+              </Link>
+              <Link to="/gifts" className="block">
+                <Button variant="ghost" className="w-full justify-start">Gifts</Button>
+              </Link>
+              <Link to="/wallet" className="block">
+                <Button variant="ghost" className="w-full justify-start">Wallet</Button>
+              </Link>
+              <Link to="/notifications" className="block">
+                <Button variant="ghost" className="w-full justify-start">Notifications</Button>
+              </Link>
+              <Link to="/settings" className="block">
+                <Button variant="ghost" className="w-full justify-start">Settings</Button>
+              </Link>
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Go Live Modal */}
         <AnimatePresence>
@@ -1982,67 +2027,68 @@ const Live = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50"
               onClick={() => setShowGoLive(false)}
             >
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.9, opacity: 0 }}
-                className="w-full max-w-md mx-auto bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden"
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25 }}
+                className="w-full bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl max-w-md mx-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="p-6">
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-rose-500 to-purple-500 flex items-center justify-center">
-                      <Video className="w-8 h-8 text-white" />
+                <div className="p-5">
+                  <div className="text-center mb-4">
+                    <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gradient-to-r from-rose-500 to-purple-500 flex items-center justify-center">
+                      <Video className="w-7 h-7 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-gray-100">
+                    <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-gray-100">
                       Go Live
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Start your own live stream and connect with the community
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      Start your own live stream
                     </p>
                   </div>
 
-                  <div className="space-y-4 mb-6">
+                  <div className="space-y-3 mb-4">
                     <div>
-                      <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
                         Stream Title
                       </label>
                       <Input
-                        placeholder="Enter your stream title..."
+                        placeholder="Enter title..."
                         value={streamTitle}
                         onChange={(e) => setStreamTitle(e.target.value)}
+                        className="h-9 text-sm"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
                         Category
                       </label>
                       <select 
                         value={streamCategory}
                         onChange={(e) => setStreamCategory(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
+                        className="w-full h-9 px-3 text-sm border rounded-lg bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
                       >
-                        <option value="entertainment">Entertainment</option>
-                        <option value="advice">Advice</option>
-                        <option value="lifestyle">Lifestyle</option>
-                        <option value="gaming">Gaming</option>
-                        <option value="creative">Creative</option>
-                        <option value="health">Health</option>
+                        <option value="icebreakers">Ice Breakers</option>
+                        <option value="speed_dating">Speed Dating</option>
+                        <option value="date_ideas">Date Ideas</option>
+                        <option value="relationship_advice">Advice</option>
+                        <option value="first_dates">First Dates</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                      <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
                         Stream Type
                       </label>
                       <select 
                         value={streamType}
                         onChange={(e) => setStreamType(e.target.value as any)}
-                        className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
+                        className="w-full h-9 px-3 text-sm border rounded-lg bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700"
                       >
                         <option value="public">Public (Free)</option>
                         <option value="private">Private (Paid)</option>
@@ -2050,22 +2096,9 @@ const Live = () => {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                        Max Viewers
-                      </label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={1000}
-                        value={maxViewers}
-                        onChange={(e) => setMaxViewers(parseInt(e.target.value))}
-                      />
-                    </div>
-
                     {streamType === 'private' && (
                       <div>
-                        <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                        <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
                           Cost per Minute (Coins)
                         </label>
                         <Input
@@ -2073,18 +2106,19 @@ const Live = () => {
                           min={0}
                           value={costPerMinute}
                           onChange={(e) => setCostPerMinute(parseInt(e.target.value))}
+                          className="h-9 text-sm"
                         />
                       </div>
                     )}
                   </div>
 
-                  <div className="flex gap-3">
-                    <Button onClick={() => setShowGoLive(false)} variant="outline" className="flex-1">
+                  <div className="flex gap-2">
+                    <Button onClick={() => setShowGoLive(false)} variant="outline" className="flex-1 text-sm h-9">
                       Cancel
                     </Button>
-                    <Button onClick={handleStartLive} className="flex-1 bg-gradient-to-r from-rose-500 to-purple-500 text-white">
+                    <Button onClick={handleStartLive} className="flex-1 bg-gradient-to-r from-rose-500 to-purple-500 text-white text-sm h-9">
                       <Video className="w-4 h-4 mr-2" />
-                      Start Live
+                      Start
                     </Button>
                   </div>
                 </div>

@@ -33,7 +33,7 @@ export const PublicNavbar = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            <Button variant="ghost" onClick={() => handleNavigation('/')}>
+            <Button variant="ghost" onClick={() => handleNavigation('/dashboard')}>
               Home
             </Button>
             <Button variant="ghost" onClick={() => handleNavigation('/about')}>
@@ -72,7 +72,7 @@ export const PublicNavbar = () => {
         {isMobileMenuOpen && (
           <div className="md:hidden py-4 border-t">
             <nav className="flex flex-col gap-4">
-              <Button variant="ghost" onClick={() => handleNavigation('/')} className="justify-start">
+              <Button variant="ghost" onClick={() => handleNavigation('/dashboard')} className="justify-start">
                 Home
               </Button>
               <Button variant="ghost" onClick={() => handleNavigation('/about')} className="justify-start">

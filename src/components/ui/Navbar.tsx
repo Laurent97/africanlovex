@@ -68,7 +68,7 @@ const Navbar = () => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link 
-              to="/" 
+              to="/dashboard" 
               className="flex items-center gap-2 text-xl font-bold transition-colors hover:opacity-80"
               style={{ 
                 fontFamily: "'Playfair Display', serif",

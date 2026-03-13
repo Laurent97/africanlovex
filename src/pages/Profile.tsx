@@ -117,7 +117,6 @@ const Profile = () => {
     gender: '',
     country: 'Rwanda',
     city: 'Kigali',
-    tribe: '',
     languages: ['English'],
     interests: ['Travel', 'Music', 'Coffee'],
     relationship_intention: 'looking_for_love',
@@ -211,7 +210,6 @@ const Profile = () => {
           gender: existingProfile.gender || profileData.gender,
           country: existingProfile.country || profileData.country,
           city: existingProfile.city || profileData.city,
-          tribe: existingProfile.tribe || profileData.tribe,
           languages: languages,
           interests: interests,
           relationship_intention: existingProfile.relationship_intention || profileData.relationship_intention,
@@ -249,7 +247,6 @@ const Profile = () => {
           gender: existingProfile.gender || profileData.gender,
           country: existingProfile.country || profileData.country,
           city: existingProfile.city || profileData.city,
-          tribe: existingProfile.tribe || profileData.tribe,
           languages: languages,
           interests: interests,
           relationship_intention: existingProfile.relationship_intention || profileData.relationship_intention,
@@ -288,7 +285,6 @@ const Profile = () => {
           gender: '',
           country: 'Rwanda',
           city: 'Kigali',
-          tribe: '',
           languages: ['English'],
           interests: ['Travel', 'Music', 'Coffee'],
           relationship_intention: 'looking_for_love' as const,
@@ -365,7 +361,6 @@ const Profile = () => {
           gender: tempData.gender,
           country: tempData.country,
           city: tempData.city,
-          tribe: tempData.tribe,
           languages: tempData.languages,
           interests: tempData.interests,
           relationship_intention: tempData.relationship_intention,
@@ -1112,15 +1107,6 @@ const Profile = () => {
                           />
                         </div>
                         <div>
-                          <Label htmlFor="tribe">Tribe/Ethnicity</Label>
-                          <Input
-                            id="tribe"
-                            value={tempData.tribe}
-                            onChange={(e) => setTempData({ ...tempData, tribe: e.target.value })}
-                            className="border-gray-300"
-                          />
-                        </div>
-                        <div>
                           <Label htmlFor="languages">Languages</Label>
                           <Select onValueChange={handleAddLanguage}>
                             <SelectTrigger id="languages" className="border-gray-300">
@@ -1162,10 +1148,6 @@ const Profile = () => {
                           <div>
                             <h3 className="text-sm font-medium text-gray-500 mb-1">Location</h3>
                             <p className="text-gray-900">{profileData.city}, {profileData.country}</p>
-                          </div>
-                          <div>
-                            <h3 className="text-sm font-medium text-gray-500 mb-1">Tribe</h3>
-                            <p className="text-gray-900">{profileData.tribe || 'Not specified'}</p>
                           </div>
                         </div>
                         <div>
@@ -1509,7 +1491,7 @@ const Profile = () => {
                   <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
                   <div className="space-y-3">
                     <VerificationGate feature="matching">
-                      <Link to="/matching">
+                      <Link to="/discover">
                         <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700">
                           <Heart className="w-4 h-4 mr-2" />
                           Start Matching

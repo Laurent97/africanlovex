@@ -17,7 +17,6 @@ export interface UserProfile {
   gender: string;
   country: string;
   city: string;
-  tribe: string;
   languages: string[];
   interests: string[];
   relationship_intention: 'looking_for_love' | 'serious_only' | 'friends_first' | 'sugar_daddy' | 'sugar_mommy';

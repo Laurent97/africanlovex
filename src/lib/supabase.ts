@@ -9,6 +9,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     storage: typeof window !== 'undefined' ? window.localStorage : null,
+    flowType: 'pkce', // More secure auth flow
+    debug: false, // Disable debug in production
+  },
+  db: {
+    schema: 'public',
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'loveX/1.0.0',
+    },
+  },
+  // Enable real-time subscriptions
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
   },
 })
 
@@ -26,7 +42,6 @@ export type Database = {
           gender: 'male' | 'female' | 'other' | null
           country: string | null
           city: string | null
-          tribe: string | null
           languages: string[] | null
           interests: string[] | null
           relationship_intention: 'looking_for_love' | 'serious_only' | 'friends_first' | 'sugar_daddy' | 'sugar_mommy' | null
@@ -48,7 +63,6 @@ export type Database = {
           gender?: 'male' | 'female' | 'other' | null
           country?: string | null
           city?: string | null
-          tribe?: string | null
           languages?: string[] | null
           interests?: string[] | null
           relationship_intention?: 'looking_for_love' | 'serious_only' | 'friends_first' | 'sugar_daddy' | 'sugar_mommy' | null
@@ -70,7 +84,6 @@ export type Database = {
           gender?: 'male' | 'female' | 'other' | null
           country?: string | null
           city?: string | null
-          tribe?: string | null
           languages?: string[] | null
           interests?: string[] | null
           relationship_intention?: 'looking_for_love' | 'serious_only' | 'friends_first' | 'sugar_daddy' | 'sugar_mommy' | null

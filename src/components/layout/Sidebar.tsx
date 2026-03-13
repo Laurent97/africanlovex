@@ -27,7 +27,7 @@ export const Sidebar = () => {
   const navigate = useNavigate();
 
   const navigation = [
-    { path: '/', icon: Home, label: 'Home' },
+    { path: '/dashboard', icon: Home, label: 'Home' },
     { path: '/discover', icon: Compass, label: 'Discover' },
     { path: '/live', icon: Video, label: 'Live' },
     { path: '/chat', icon: MessageCircle, label: 'Messages' },

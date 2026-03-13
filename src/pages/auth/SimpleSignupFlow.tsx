@@ -44,7 +44,6 @@ interface SignupData {
   showGender: boolean;
   country: string;
   city: string;
-  tribe: string;
   languages: string[];
   photos: string[];
   bio: string;
@@ -115,15 +114,6 @@ const SimpleSignupFlow: React.FC = () => {
     'Congo', 'DRC', 'Angola', 'Zambia', 'Malawi', 'Mozambique',
     'Zimbabwe', 'Botswana', 'Namibia', 'South Africa', 'Eswatini',
     'Lesotho', 'Madagascar', 'Mauritius', 'Seychelles', 'Comoros'
-  ];
-
-  const tribes = [
-    'Tutsi', 'Hutu', 'Twa', 'Kikuyu', 'Luo', 'Kalenjin', 'Luhya',
-    'Kamba', 'Meru', 'Embu', 'Mbeere', 'Taita', 'Pare', 'Chaga',
-    'Iraqw', 'Gorowa', 'Rangi', 'Chagga', 'Sambaa', 'Digo', 'Bondei',
-    'Zanaki', 'Makonde', 'Yao', 'Ngoni', 'Tumbuka', 'Chewa', 'Nyanja',
-    'Lomwe', 'Sen', 'Khoe', 'San', 'Ovambo', 'Herero', 'Nama', 'Damara',
-    'Lozi', 'Tonga', 'Ila', 'Lunda', 'Luba', 'Kongo'
   ];
 
   const languages = [
@@ -206,7 +196,6 @@ const SimpleSignupFlow: React.FC = () => {
       case 2:
         if (!signupData.country) newErrors.country = 'Country is required';
         if (!signupData.city) newErrors.city = 'City is required';
-        if (!signupData.tribe) newErrors.tribe = 'Tribe is required';
         if (!signupData.languages || signupData.languages.length === 0) newErrors.languages = 'Select at least one language';
         break;
         
@@ -349,7 +338,6 @@ const SimpleSignupFlow: React.FC = () => {
         show_gender: signupData.showGender!,
         country: signupData.country!,
         city: signupData.city!,
-        tribe: signupData.tribe!,
         languages: signupData.languages!,
         avatar_url: signupData.photos?.[0],
         bio: signupData.bio!,
@@ -599,21 +587,6 @@ const SimpleSignupFlow: React.FC = () => {
                   className={errors.city ? 'border-red-500' : ''}
                 />
                 {errors.city && <p className="text-red-500 text-sm">{errors.city}</p>}
-              </div>
-
-              <div>
-                <Label htmlFor="tribe">Tribe/Ethnicity</Label>
-                <Select value={signupData.tribe || ''} onValueChange={(value) => setSignupData(prev => ({ ...prev, tribe: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your tribe/ethnicity" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {tribes.map(tribe => (
-                      <SelectItem key={tribe} value={tribe}>{tribe}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.tribe && <p className="text-red-500 text-sm">{errors.tribe}</p>}
               </div>
 
               <div>

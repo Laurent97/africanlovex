@@ -60,7 +60,6 @@ const step1Schema = z.object({
 const step2Schema = z.object({
   country: z.string().min(1, 'Please select your country'),
   city: z.string().min(2, 'City must be at least 2 characters'),
-  tribe: z.string().min(1, 'Please select your tribe/ethnicity'),
   languages: z.array(z.string()).min(1, 'Select at least one language')
 });
 

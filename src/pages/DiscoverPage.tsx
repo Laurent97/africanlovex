@@ -7,7 +7,8 @@ import {
   List, 
   SlidersHorizontal,
   X,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { ResponsiveProfileCard } from '@/components/profile/ResponsiveProfileCard';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -17,72 +18,41 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useKeyboard } from '@/hooks/useKeyboard';
+import { searchProfiles } from '@/lib/profile';
+import { useAuth } from '@/hooks/use-auth';
+import type { Database } from '@/lib/supabase';
 
 interface UserProfile {
   id: string;
-  full_name: string;
-  age: number;
-  location: string;
-  bio: string;
-  avatar_url?: string;
-  photos?: string[];
-  occupation?: string;
-  interests?: string[];
-  is_verified?: boolean;
-  vip_tier?: string;
+  username: string;
+  full_name: string | null;
+  age: number | null;
+  country: string | null;
+  city: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  interests: string[] | null;
+  languages: string[] | null;
+  gender: 'male' | 'female' | 'other' | null;
+  relationship_intention: 'looking_for_love' | 'serious_only' | 'friends_first' | 'sugar_daddy' | 'sugar_mommy' | null;
+  is_verified: boolean;
+  vip_tier: 'free' | 'basic' | 'premium' | 'platinum' | 'diamond';
+  verification_level: 'basic' | 'standard' | 'premium';
   distance?: number;
 }
 
-const mockProfiles: UserProfile[] = [
-  {
-    id: '1',
-    full_name: 'Sarah Johnson',
-    age: 28,
-    location: 'Kigali, Rwanda',
-    bio: 'Passionate about photography and exploring new cultures. Looking for someone who loves adventure!',
-    avatar_url: '/placeholder.svg',
-    photos: ['/placeholder.svg'],
-    occupation: 'Photographer',
-    interests: ['Photography', 'Travel', 'Cooking', 'Music'],
-    is_verified: true,
-    vip_tier: 'premium',
-    distance: 5
-  },
-  {
-    id: '2',
-    full_name: 'Michael Chen',
-    age: 32,
-    location: 'Nairobi, Kenya',
-    bio: 'Tech entrepreneur who enjoys hiking and trying new restaurants. Let\'s explore the city together!',
-    avatar_url: '/placeholder.svg',
-    photos: ['/placeholder.svg'],
-    occupation: 'Software Engineer',
-    interests: ['Technology', 'Hiking', 'Food', 'Startups'],
-    is_verified: true,
-    distance: 12
-  },
-  {
-    id: '3',
-    full_name: 'Amina Hassan',
-    age: 26,
-    location: 'Dar es Salaam, Tanzania',
-    bio: 'Artist and yoga instructor. Seeking meaningful connections with creative souls.',
-    avatar_url: '/placeholder.svg',
-    photos: ['/placeholder.svg'],
-    occupation: 'Artist',
-    interests: ['Art', 'Yoga', 'Meditation', 'Dance'],
-    is_verified: false,
-    distance: 8
-  }
-];
 
 export const DiscoverPage = () => {
   const navigate = useNavigate();
   const { isKeyboardVisible } = useKeyboard();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [filteredResults, setFilteredResults] = useState(mockProfiles);
+  const [filteredResults, setFilteredResults] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   
   // Filter states
   const [ageRange, setAgeRange] = useState([25, 35]);
@@ -90,38 +60,181 @@ export const DiscoverPage = () => {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [showVerifiedOnly, setShowVerifiedOnly] = useState(false);
 
+  // Fetch profiles with filters
+  const fetchProfilesWithFilters = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const filters: any = {
+        limit: 100,
+        age_min: ageRange[0],
+        age_max: ageRange[1]
+      };
+      
+      // Add interest filter if selected
+      if (selectedInterests.length > 0) {
+        filters.interests = selectedInterests;
+      }
+      
+      // Add verified filter
+      if (showVerifiedOnly) {
+        // This would need to be implemented in the searchProfiles function
+        // For now, we'll filter client-side
+      }
+      
+      const { profiles } = await searchProfiles(filters);
+      
+      console.log('searchProfiles result:', profiles); // Debug log
+      console.log('filters applied:', filters); // Debug log
+      
+      // If no profiles from database, add some mock data for testing
+      let profilesData = profiles;
+      if (!profiles || profiles.length === 0) {
+        console.log('No profiles from database, using mock data');
+        profilesData = [
+          {
+            id: 'mock-1',
+            username: 'sarah_j',
+            full_name: 'Sarah Johnson',
+            avatar_url: null,
+            bio: 'Passionate about photography and exploring new cultures. Looking for someone who loves adventure!',
+            age: 28,
+            gender: 'female' as const,
+            country: 'Rwanda',
+            city: 'Kigali',
+            languages: ['English', 'Kinyarwanda'],
+            interests: ['Photography', 'Travel', 'Cooking', 'Music'],
+            relationship_intention: 'looking_for_love',
+            verification_level: 'standard',
+            is_verified: true,
+            is_premium: true,
+            vip_tier: 'premium',
+            coins_balance: 1000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 'mock-2',
+            username: 'mike_c',
+            full_name: 'Michael Chen',
+            avatar_url: null,
+            bio: 'Tech entrepreneur who enjoys hiking and trying new restaurants. Let\'s explore the city together!',
+            age: 32,
+            gender: 'male' as const,
+            country: 'Kenya',
+            city: 'Nairobi',
+            languages: ['English', 'Swahili'],
+            interests: ['Technology', 'Hiking', 'Food', 'Startups'],
+            relationship_intention: 'serious_only',
+            verification_level: 'premium',
+            is_verified: true,
+            is_premium: true,
+            vip_tier: 'premium',
+            coins_balance: 1500,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          {
+            id: 'mock-3',
+            username: 'amina_h',
+            full_name: 'Amina Hassan',
+            avatar_url: null,
+            bio: 'Artist and yoga instructor. Seeking meaningful connections with creative souls.',
+            age: 26,
+            gender: 'female' as const,
+            country: 'Tanzania',
+            city: 'Dar es Salaam',
+            languages: ['English', 'Swahili'],
+            interests: ['Art', 'Yoga', 'Meditation', 'Dance'],
+            relationship_intention: 'friends_first',
+            verification_level: 'basic',
+            is_verified: false,
+            is_premium: false,
+            vip_tier: 'free',
+            coins_balance: 500,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        ];
+      }
+      
+      // Filter out current user and apply additional filters
+      let filteredProfiles = profilesData
+        .filter(profile => profile.id !== user?.id);
+      
+      // Apply verified filter (client-side for now)
+      if (showVerifiedOnly) {
+        filteredProfiles = filteredProfiles.filter(profile => profile.is_verified);
+      }
+      
+      // Apply search query filter (client-side for now)
+      if (searchQuery) {
+        filteredProfiles = filteredProfiles.filter(profile => 
+          profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          profile.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          profile.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          profile.country?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          profile.bio?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+      
+      // Apply distance filter (client-side)
+      filteredProfiles = filteredProfiles.filter(profile => {
+        const distance = calculateDistance(profile);
+        return distance <= maxDistance[0];
+      }).map(profile => ({
+        ...profile,
+        distance: calculateDistance(profile)
+      }));
+      
+      setAllProfiles(filteredProfiles);
+      setFilteredResults(filteredProfiles);
+      
+      console.log('final filtered profiles count:', filteredProfiles.length); // Debug log
+      console.log('allProfiles set:', filteredProfiles.length); // Debug log
+    } catch (err) {
+      console.error('Error fetching profiles:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch profiles');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch all profiles on component mount and when filters change
+  useEffect(() => {
+    fetchProfilesWithFilters();
+  }, [user, ageRange, selectedInterests, showVerifiedOnly, maxDistance]);
+  
+  // Debounced search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (allProfiles.length > 0) {
+        const filtered = allProfiles.filter(profile => 
+          !searchQuery || 
+          profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          profile.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          profile.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          profile.country?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          profile.bio?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setFilteredResults(filtered);
+      }
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, allProfiles]);
+
+  // Simple distance calculation (placeholder - would need real geolocation data)
+  const calculateDistance = (profile: UserProfile): number => {
+    // This is a placeholder - in a real app, you'd calculate based on coordinates
+    return Math.floor(Math.random() * 50) + 1; // Random distance 1-50km
+  };
+
   const allInterests = Array.from(
-    new Set(mockProfiles.flatMap(profile => profile.interests || []))
+    new Set(allProfiles.flatMap(profile => profile.interests || []))
   );
 
-  useEffect(() => {
-    let filtered = mockProfiles.filter(profile => {
-      // Search filter
-      const matchesSearch = !searchQuery || 
-        profile.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        profile.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        profile.bio.toLowerCase().includes(searchQuery.toLowerCase());
-
-      // Age filter
-      const matchesAge = profile.age >= ageRange[0] && profile.age <= ageRange[1];
-
-      // Distance filter
-      const matchesDistance = !profile.distance || profile.distance <= maxDistance[0];
-
-      // Interests filter
-      const matchesInterests = selectedInterests.length === 0 ||
-        (profile.interests && selectedInterests.some(interest => 
-          profile.interests!.includes(interest)
-        ));
-
-      // Verified filter
-      const matchesVerified = !showVerifiedOnly || profile.is_verified;
-
-      return matchesSearch && matchesAge && matchesDistance && matchesInterests && matchesVerified;
-    });
-
-    setFilteredResults(filtered);
-  }, [searchQuery, ageRange, maxDistance, selectedInterests, showVerifiedOnly]);
 
   const handleInterestToggle = (interest: string) => {
     setSelectedInterests(prev => 
@@ -321,43 +434,77 @@ export const DiscoverPage = () => {
 
       {/* Results */}
       <div className="container mx-auto px-4 pb-24">
-        {/* Results Count */}
-        <div className="py-4">
-          <p className="text-sm text-gray-500">
-            {filteredResults.length} {filteredResults.length === 1 ? 'person' : 'people'} found
-          </p>
-        </div>
-
-        {/* Responsive Grid */}
-        {filteredResults.length > 0 ? (
-          <div className={`
-            grid gap-4
-            ${viewMode === 'grid' 
-              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
-              : 'grid-cols-1'
-            }
-          `}>
-            {filteredResults.map(profile => (
-              <ResponsiveProfileCard
-                key={profile.id}
-                profile={profile}
-                variant={viewMode === 'list' ? 'horizontal' : 'vertical'}
-              />
-            ))}
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+            <p className="text-gray-500">Loading profiles...</p>
           </div>
-        ) : (
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
           <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-gray-400" />
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-red-500" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
-            <p className="text-gray-500 mb-4">
-              Try adjusting your filters or search terms
-            </p>
-            <Button onClick={clearFilters} variant="outline">
-              Clear filters
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading profiles</h3>
+            <p className="text-gray-500 mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()} variant="outline">
+              Try again
             </Button>
           </div>
+        )}
+
+        {/* Results */}
+        {!loading && !error && (
+          <>
+            {/* Results Count */}
+            <div className="py-4">
+              <p className="text-sm text-gray-500">
+                {filteredResults.length} {filteredResults.length === 1 ? 'person' : 'people'} found
+              </p>
+            </div>
+
+            {/* Responsive Grid */}
+            {filteredResults.length > 0 ? (
+              <div className={`
+                grid gap-4
+                ${viewMode === 'grid' 
+                  ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
+                  : 'grid-cols-1'
+                }
+              `}>
+                {filteredResults.map(profile => (
+                  <ResponsiveProfileCard
+                    key={profile.id}
+                    profile={{
+                      ...profile,
+                      location: profile.city && profile.country 
+                        ? `${profile.city}, ${profile.country}`
+                        : profile.country || 'Unknown location',
+                      photos: profile.avatar_url ? [profile.avatar_url] : [`https://ui-avatars.com/api/?name=${encodeURIComponent(profile.username || profile.full_name || 'User')}&size=400&background=B11D2D&color=fff&format=png`],
+                      occupation: undefined // Not in database schema
+                    }}
+                    variant={viewMode === 'list' ? 'horizontal' : 'vertical'}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
+                <p className="text-gray-500 mb-4">
+                  Try adjusting your filters or search terms
+                </p>
+                <Button onClick={clearFilters} variant="outline">
+                  Clear filters
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
