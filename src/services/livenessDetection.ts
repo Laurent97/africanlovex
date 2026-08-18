@@ -1,9 +1,18 @@
-import { 
-  LivenessResult, 
-  SpoofResult, 
+import {
+  LivenessResult,
+  SpoofResult,
   CheckResult,
-  VERIFICATION_CONSTANTS 
+  VERIFICATION_CONSTANTS
 } from '../types/verification';
+
+interface FaceData {
+  landmarks?: {
+    positions?: Array<{ x: number; y: number }>;
+  };
+  expressions?: {
+    asSortedArray?: () => Array<{ expression: string; score: number }>;
+  };
+}
 
 export class LivenessDetectionService {
   private blinkHistory: number[] = [];
@@ -13,7 +22,7 @@ export class LivenessDetectionService {
   private readonly blinkThreshold = 0.2;
   private readonly movementThreshold = 5;
 
-  async checkLiveness(imageData: ImageData, faceData?: any): Promise<LivenessResult> {
+  async checkLiveness(imageData: ImageData, faceData?: FaceData): Promise<LivenessResult> {
     const checks = await Promise.all([
       this.checkBlinking(faceData),
       this.checkMicroExpressions(faceData),
@@ -41,7 +50,7 @@ export class LivenessDetectionService {
     };
   }
 
-  async detectSpoof(imageData: ImageData, faceData?: any): Promise<SpoofResult> {
+  async detectSpoof(imageData: ImageData, faceData?: FaceData): Promise<SpoofResult> {
     const checks = await Promise.all([
       this.checkScreenReflection(imageData),
       this.checkPaperTexture(imageData),
@@ -67,7 +76,7 @@ export class LivenessDetectionService {
     };
   }
 
-  private async checkBlinking(faceData?: any): Promise<CheckResult> {
+  private async checkBlinking(faceData?: FaceData): Promise<CheckResult> {
     if (!faceData || !faceData.landmarks) {
       return { type: 'blinking', isSpoof: false, confidence: 0.5, reason: 'No face data' };
     }
@@ -134,7 +143,7 @@ export class LivenessDetectionService {
     return blinkCount;
   }
 
-  private async checkMicroExpressions(faceData?: any): Promise<CheckResult> {
+  private async checkMicroExpressions(faceData?: FaceData): Promise<CheckResult> {
     if (!faceData || !faceData.expressions) {
       return { type: 'micro-expressions', isSpoof: false, confidence: 0.5, reason: 'No expression data' };
     }
@@ -159,7 +168,7 @@ export class LivenessDetectionService {
     };
   }
 
-  private async checkHeadMovement(faceData?: any): Promise<CheckResult> {
+  private async checkHeadMovement(faceData?: FaceData): Promise<CheckResult> {
     if (!faceData || !faceData.landmarks) {
       return { type: 'head-movement', isSpoof: false, confidence: 0.5, reason: 'No face data' };
     }
@@ -374,7 +383,7 @@ export class LivenessDetectionService {
     return regions;
   }
 
-  private async checkEyeBlinkSequence(faceData?: any): Promise<CheckResult> {
+  private async checkEyeBlinkSequence(faceData?: FaceData): Promise<CheckResult> {
     // More sophisticated blink sequence analysis
     const blinkResult = await this.checkBlinking(faceData);
     

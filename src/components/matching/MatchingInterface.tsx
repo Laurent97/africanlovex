@@ -59,7 +59,7 @@ export const MatchingInterface: React.FC<MatchingInterfaceProps> = ({
       setProfiles(matches)
       setCurrentIndex(0)
       setCurrentProfile(matches[0] || null)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading profiles:', error)
     } finally {
       setLoading(false)
@@ -89,7 +89,7 @@ export const MatchingInterface: React.FC<MatchingInterfaceProps> = ({
 
       // Move to next profile
       moveToNext()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error liking profile:', error)
     } finally {
       setSwiping(false)
@@ -106,7 +106,7 @@ export const MatchingInterface: React.FC<MatchingInterfaceProps> = ({
 
       await swipeProfile(user.id, profileId, 'pass')
       moveToNext()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error passing profile:', error)
     } finally {
       setSwiping(false)
@@ -124,7 +124,7 @@ export const MatchingInterface: React.FC<MatchingInterfaceProps> = ({
     }
   }
 
-  const handleFilterChange = (key: keyof MatchFilters, value: any) => {
+  const handleFilterChange = (key: keyof MatchFilters, value: string | number | string[] | undefined) => {
     setFilters(prev => ({ ...prev, [key]: value }))
   }
 
@@ -295,9 +295,9 @@ export const MatchingInterface: React.FC<MatchingInterfaceProps> = ({
 
               <div className="space-y-2">
                 <Label>Verification Level</Label>
-                <Select 
-                  value={filters.verification_level || ''} 
-                  onValueChange={(value: any) => handleFilterChange('verification_level', value)}
+                <Select
+                  value={filters.verification_level || ''}
+                  onValueChange={(value: 'basic' | 'standard' | 'premium' | '') => handleFilterChange('verification_level', value || undefined)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Any level" />

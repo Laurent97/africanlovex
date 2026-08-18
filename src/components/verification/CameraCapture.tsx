@@ -113,14 +113,14 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
 
       console.log('Camera started successfully');
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Camera access failed:', err);
       
       let userMessage = 'Camera access failed. Please allow camera access to continue.';
       
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      if (err instanceof Error && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
         userMessage = 'Camera access was denied. Please allow camera access in your browser settings and refresh the page.';
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+      } else if (err instanceof Error && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')) {
         userMessage = 'No camera device found. Please connect a camera and try again.';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
         userMessage = 'Camera is already in use by another application. Please close other apps using the camera and try again.';
@@ -490,7 +490,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({
 // Camera Overlay Component
 interface CameraOverlayProps {
   detectionState: PoseDetectionState;
-  instruction: any;
+  instruction: { title: string; description: string; durationSeconds: number };
   lighting: { isGood: boolean; brightness: number };
   isDetecting: boolean;
 }

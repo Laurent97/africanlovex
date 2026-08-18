@@ -177,15 +177,6 @@ const Wallet = () => {
   });
 
   // Load user balance and transactions on mount
-  useEffect(() => {
-    if (user) {
-      loadUserBalance();
-      loadTransactions();
-      loadBanks();
-      loadGiftExchangeStats();
-    }
-  }, [user]);
-
   const loadGiftExchangeStats = async () => {
     try {
       const { data, error } = await supabase
@@ -339,6 +330,17 @@ const Wallet = () => {
     }
   };
 
+  // Load wallet data on mount
+  useEffect(() => {
+    if (user) {
+      loadUserBalance();
+      loadTransactions();
+      loadBanks();
+      loadGiftExchangeStats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   const verifyAccount = async () => {
     if (!selectedBank || !accountNumber) return;
 
@@ -371,107 +373,43 @@ const Wallet = () => {
   };
 
   const handleDeposit = async () => {
-    if (!selectedPackage) return;
+    if (!selectedPackage || !user) return;
 
-    // For mobile money, show the mobile money payment component
-    if (paymentMethod === 'mtn' || paymentMethod === 'airtel' || paymentMethod === 'mpesa') {
-      // Show payment processing for mobile money
-      setIsProcessing(true);
-      const selectedPkg = coinPackages.find(p => p.id === selectedPackage);
-      if (!selectedPkg) return;
-
-      try {
-        // Simulate mobile money payment processing
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Update local balance (simulated)
-        const newBalance = userBalance + selectedPkg.coins + selectedPkg.bonus;
-        setUserBalance(newBalance);
-        
-        // Add to local transactions (simulated)
-        const newTransaction: Transaction = {
-          id: Date.now().toString(),
-          type: 'purchase',
-          amount: selectedPkg.price,
-          coins: selectedPkg.coins + selectedPkg.bonus,
-          description: `${selectedPkg.name} Purchase`,
-          timestamp: new Date(),
-          status: 'completed',
-          paymentMethod: paymentMethods.find(m => m.id === paymentMethod)?.name,
-          reference: `MOBILE_${Date.now()}`
-        };
-
-        setTransactions(prev => [newTransaction, ...prev]);
-        
-        toast({
-          title: "Purchase Successful! 🎉",
-          description: `You've received ${(selectedPkg.coins + selectedPkg.bonus).toLocaleString()} LX coins!`,
-          variant: "default",
-        });
-
-        setShowDepositModal(false);
-        setSelectedPackage(null);
-        setPaymentMethod('');
-
-      } catch (error: any) {
-        console.error('Deposit error:', error);
-        toast({
-          title: "Payment Failed",
-          description: error.message || "There was an error processing your payment. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsProcessing(false);
-      }
-      return;
-    }
-
-    // Handle other payment methods (card, crypto, bank)
-    setIsProcessing(true);
     const selectedPkg = coinPackages.find(p => p.id === selectedPackage);
     if (!selectedPkg) return;
 
+    setIsProcessing(true);
     try {
-      // Simulate payment processing for demo purposes
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Update local balance (simulated)
-      const newBalance = userBalance + selectedPkg.coins + selectedPkg.bonus;
-      setUserBalance(newBalance);
-      
-      // Add to local transactions (simulated)
-      const newTransaction: Transaction = {
-        id: Date.now().toString(),
-        type: 'purchase',
-        amount: selectedPkg.price,
-        coins: selectedPkg.coins + selectedPkg.bonus,
-        description: `${selectedPkg.name} Purchase`,
-        timestamp: new Date(),
-        status: 'completed',
-        paymentMethod: paymentMethods.find(m => m.id === paymentMethod)?.name,
-        reference: `DEMO_${Date.now()}`
-      };
+      const tx_ref = `LX_${user.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      setTransactions(prev => [newTransaction, ...prev]);
-      
-      toast({
-        title: "Purchase Successful! 🎉",
-        description: `You've received ${(selectedPkg.coins + selectedPkg.bonus).toLocaleString()} LX coins!`,
-        variant: "default",
+      const data = await paymentsApi.initiatePayment({
+        amount: selectedPkg.price,
+        currency: selectedPkg.currency,
+        email: user.email || '',
+        fullname: user.user_metadata?.full_name || '',
+        tx_ref,
+        payment_method: paymentMethod,
+        meta: {
+          purpose: 'coin_purchase',
+          package_id: selectedPkg.id,
+          coins: selectedPkg.coins,
+          bonus: selectedPkg.bonus,
+          user_id: user.id
+        }
       });
 
-      setShowDepositModal(false);
-      setSelectedPackage(null);
-      setPaymentMethod('');
-
-    } catch (error: any) {
+      if (data.status === 'success' && (data.data as any)?.authorization_url) {
+        window.location.href = (data.data as any).authorization_url;
+      } else {
+        throw new Error(data.message || 'Payment initiation failed');
+      }
+    } catch (error: unknown) {
       console.error('Deposit error:', error);
       toast({
         title: "Payment Failed",
-        description: error.message || "There was an error processing your payment. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error processing your payment. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -652,17 +590,10 @@ const Wallet = () => {
     const selectedPkg = coinPackages.find(p => p.id === selectedPackage);
     if (!selectedPkg) return;
 
-    // For mobile money, show additional fields
-    if (paymentMethod.startsWith('mtn') || paymentMethod.startsWith('airtel') || paymentMethod.startsWith('mpesa')) {
-      // This will be handled in the payment modal
-      return;
-    }
-
     setIsProcessing(true);
     try {
       const tx_ref = `LX_${user.id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-      // Call payments API to initiate payment
       const data = await paymentsApi.initiatePayment({
         amount: selectedPkg.price,
         currency: selectedPkg.currency,
@@ -671,6 +602,7 @@ const Wallet = () => {
         tx_ref,
         payment_method: paymentMethod,
         meta: {
+          purpose: 'coin_purchase',
           package_id: selectedPkg.id,
           coins: selectedPkg.coins,
           bonus: selectedPkg.bonus,
@@ -678,90 +610,20 @@ const Wallet = () => {
         }
       });
 
-      if (data.status === 'success') {
-        // For card payments, redirect to Flutterwave checkout
-        if (paymentMethod === 'card' && data.data?.link) {
-          window.location.href = data.data.link;
-        } else {
-          // For other methods, wait for webhook
-          toast({
-            title: "Payment Initiated",
-            description: "Please complete the payment on your phone",
-          });
-
-          // Poll for transaction status
-          pollTransactionStatus(data.data?.tx_ref || tx_ref);
-        }
+      if (data.status === 'success' && (data.data as any)?.authorization_url) {
+        // Redirect to Paystack to complete payment
+        window.location.href = (data.data as any).authorization_url;
       } else {
         throw new Error(data.message || 'Payment initiation failed');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Payment Failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Payment failed',
         variant: "destructive",
       });
       setIsProcessing(false);
     }
-  };
-
-  const pollTransactionStatus = async (txRef: string) => {
-    const interval = setInterval(async () => {
-      try {
-        const data = await paymentsApi.verifyTransaction(txRef);
-
-        if (data.status === 'success' && data.data?.status === 'successful') {
-          clearInterval(interval);
-          
-          const selectedPkg = coinPackages.find(p => p.id === selectedPackage);
-          if (!selectedPkg) return;
-
-          // Update local balance
-          setUserBalance(prev => prev + selectedPkg.coins + selectedPkg.bonus);
-          
-          // Add transaction to list
-          const newTransaction: Transaction = {
-            id: Date.now().toString(),
-            type: 'purchase',
-            amount: selectedPkg.price,
-            coins: selectedPkg.coins + selectedPkg.bonus,
-            description: `${selectedPkg.name} Purchase`,
-            timestamp: new Date(),
-            status: 'completed',
-            paymentMethod: paymentMethods.find(m => m.id === paymentMethod)?.name,
-            reference: txRef,
-            flutterwave_reference: data.data.flw_ref
-          };
-
-          setTransactions(prev => [newTransaction, ...prev]);
-          
-          toast({
-            title: "Purchase Successful! 🎉",
-            description: `You've received ${(selectedPkg.coins + selectedPkg.bonus).toLocaleString()} LX coins!`,
-          });
-
-          setShowPaymentModal(false);
-          setSelectedPackage(null);
-          setIsProcessing(false);
-        } else if (data.data?.status === 'failed') {
-          clearInterval(interval);
-          toast({
-            title: "Payment Failed",
-            description: "Your payment was not successful. Please try again.",
-            variant: "destructive",
-          });
-          setIsProcessing(false);
-        }
-      } catch (error) {
-        console.error('Polling error:', error);
-      }
-    }, 3000);
-
-    // Stop polling after 2 minutes
-    setTimeout(() => {
-      clearInterval(interval);
-      setIsProcessing(false);
-    }, 120000);
   };
 
   const handleWithdraw = async () => {
@@ -846,10 +708,10 @@ const Wallet = () => {
       } else {
         throw new Error(data.message || 'Withdrawal failed');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Withdrawal Failed",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Withdrawal failed',
         variant: "destructive",
       });
     } finally {
@@ -1299,7 +1161,7 @@ const Wallet = () => {
                       </Select>
 
                       {/* Date Range */}
-                      <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
+                      <Select value={dateRange} onValueChange={(value: 'today' | 'week' | 'month' | 'year' | 'all') => setDateRange(value)}>
                         <SelectTrigger className="w-32 border-gray-300">
                           <SelectValue placeholder="Date range" />
                         </SelectTrigger>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Gift, 
@@ -34,8 +34,8 @@ interface GiftSenderProps {
   recipientId: string;
   recipientName?: string;
   context: 'chat' | 'live_stream' | 'profile';
-  contextDetails?: any;
-  onGiftSent?: (gift: any) => void;
+  contextDetails?: Record<string, unknown>;
+  onGiftSent?: (gift: Gift) => void;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -58,13 +58,7 @@ const GiftSender: React.FC<GiftSenderProps> = ({
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && user) {
-      loadInventory();
-    }
-  }, [isOpen, user]);
-
-  const loadInventory = async () => {
+  const loadInventory = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('gift_inventory')
@@ -79,7 +73,13 @@ const GiftSender: React.FC<GiftSenderProps> = ({
     } catch (error) {
       console.error('Error loading inventory:', error);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      loadInventory();
+    }
+  }, [isOpen, user, loadInventory]);
 
   const getRarityColor = (rarity: string) => {
     switch (rarity) {

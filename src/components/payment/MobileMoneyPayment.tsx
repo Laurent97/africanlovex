@@ -20,11 +20,12 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
+import { paymentsApi } from '@/api/payments';
 
 interface MobileMoneyPaymentProps {
   amount: number;
   currency?: string;
-  onSuccess: (transaction: any) => void;
+  onSuccess: (transaction: Record<string, unknown>) => void;
   onError: (error: string) => void;
   onClose?: () => void;
 }
@@ -54,6 +55,15 @@ const MOBILE_NETWORKS = {
     { code: 'AIRTEL', name: 'Airtel Money', icon: '📱' },
     { code: 'ORANGE', name: 'Orange Money', icon: '📱' },
     { code: 'MPESA', name: 'M-Pesa', icon: '📱' }
+  ],
+  Nigeria: [
+    { code: 'MTN', name: 'MTN Mobile Money', icon: '📱' },
+    { code: 'AIRTEL', name: 'Airtel Money', icon: '📱' }
+  ],
+  Ghana: [
+    { code: 'MTN', name: 'MTN Mobile Money', icon: '📱' },
+    { code: 'AIRTEL', name: 'Airtel Money', icon: '📱' },
+    { code: 'TIGO', name: 'Tigo Cash', icon: '📱' }
   ]
 };
 
@@ -63,7 +73,9 @@ const COUNTRY_CONFIG = {
   Uganda: { currency: 'UGX', flag: '🇺🇬', name: 'Uganda' },
   Tanzania: { currency: 'TZS', flag: '🇹🇿', name: 'Tanzania' },
   Burundi: { currency: 'BIF', flag: '🇧🇮', name: 'Burundi' },
-  'DRC': { currency: 'CDF', flag: '🇨🇩', name: 'DRC' }
+  'DRC': { currency: 'CDF', flag: '🇨🇩', name: 'DRC' },
+  Nigeria: { currency: 'NGN', flag: '🇳🇬', name: 'Nigeria' },
+  Ghana: { currency: 'GHS', flag: '🇬🇭', name: 'Ghana' }
 };
 
 export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
@@ -171,38 +183,45 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
 
       const formattedPhone = formatPhoneNumber(phoneNumber, selectedCountry);
 
-      // Call your backend to initiate payment
-      const response = await fetch('/api/payments/mobile-money/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount,
-          currency: COUNTRY_CONFIG[selectedCountry as keyof typeof COUNTRY_CONFIG].currency,
+      const result = await paymentsApi.initiatePayment({
+        amount,
+        currency: COUNTRY_CONFIG[selectedCountry as keyof typeof COUNTRY_CONFIG].currency,
+        email: user?.email || '',
+        fullname: user?.user_metadata?.full_name || user?.user_metadata?.username || 'User',
+        tx_ref,
+        payment_method: selectedNetwork.toLowerCase(),
+        meta: {
+          purpose: 'coin_purchase',
+          user_id: user?.id,
           phone_number: formattedPhone,
           network: selectedNetwork,
-          country: selectedCountry,
-          tx_ref,
-          email: user?.email,
-          fullname: user?.user_metadata?.full_name || user?.user_metadata?.username || 'User'
-        })
+          country: selectedCountry
+        }
       });
-
-      const data = await response.json();
       
-      if (data.success) {
+      if (result.status === 'success') {
         setStep(2);
-        
+
+        const data = result.data as any;
+        const txId = data?.transaction_id || data?.reference || tx_ref;
+
+        // Open Paystack checkout so the user can complete payment
+        if (data?.authorization_url) {
+          window.open(data.authorization_url, '_blank');
+        }
+
         // Start polling for transaction status
-        startPolling(data.data.transaction_id);
+        startPolling(txId);
       } else {
-        throw new Error(data.error || 'Payment initiation failed');
+        throw new Error(result.message || 'Payment initiation failed');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Payment initiation error:', error);
-      onError(error.message);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initiate payment';
+      onError(errorMessage);
       toast({
         title: "Payment Failed",
-        description: error.message || 'Failed to initiate payment',
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -213,18 +232,31 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
   const startPolling = (transactionId: string) => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/payments/verify/${transactionId}`);
-        const data = await response.json();
+        const result = await paymentsApi.verifyTransaction(transactionId);
         
-        if (data.success) {
-          if (data.data.status === 'successful') {
+        if (result.status === 'success' && result.data) {
+          const data = result.data as any;
+          if (data.status === 'success') {
             clearInterval(interval);
             setPollingInterval(null);
-            onSuccess(data.data);
+
+            // Mark the payment record as successful
+            await supabase
+              .from('payment_transactions')
+              .update({ status: 'success', updated_at: new Date().toISOString() })
+              .eq('transaction_id', transactionId);
+
+            onSuccess(data);
             setStep(3);
-          } else if (data.data.status === 'failed') {
+          } else if (data.status === 'failed' || data.status === 'abandoned') {
             clearInterval(interval);
             setPollingInterval(null);
+
+            await supabase
+              .from('payment_transactions')
+              .update({ status: 'failed', updated_at: new Date().toISOString() })
+              .eq('transaction_id', transactionId);
+
             onError('Payment failed');
             setStep(1);
           }

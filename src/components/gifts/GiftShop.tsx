@@ -14,7 +14,7 @@ type Gift = Database['public']['Tables']['gifts']['Row']
 
 interface GiftShopProps {
   recipientId?: string
-  onGiftSent?: (gift: any) => void
+  onGiftSent?: (gift: Gift) => void
   onClose?: () => void
 }
 
@@ -61,8 +61,8 @@ export const GiftShop: React.FC<GiftShopProps> = ({
     try {
       const giftsData = await getGiftsByTier()
       setGifts(giftsData)
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to load gifts')
     }
   }
 
@@ -73,7 +73,7 @@ export const GiftShop: React.FC<GiftShopProps> = ({
         const balance = await getUserCoinBalance(user.id)
         setUserBalance(balance)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading balance:', error)
     }
   }
@@ -82,7 +82,7 @@ export const GiftShop: React.FC<GiftShopProps> = ({
     try {
       const trending = await getTrendingGifts(5)
       setTrendingGifts(trending)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading trending gifts:', error)
     }
   }
@@ -122,8 +122,8 @@ export const GiftShop: React.FC<GiftShopProps> = ({
       setTimeout(() => {
         onClose?.()
       }, 2000)
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to load gifts')
     } finally {
       setSending(false)
     }

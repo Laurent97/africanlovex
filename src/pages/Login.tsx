@@ -67,16 +67,16 @@ const Login = () => {
         });
         navigate(redirectTo, { replace: true });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
       let errorMessage = "Invalid credentials. Please try again.";
       
       // Handle specific Supabase errors
-      if (error.message?.includes('Invalid login credentials')) {
+      if (error instanceof Error && error.message?.includes('Invalid login credentials')) {
         errorMessage = "Invalid email or password. Please check your credentials and try again.";
-      } else if (error.message?.includes('Email not confirmed')) {
+      } else if (error instanceof Error && error.message?.includes('Email not confirmed')) {
         errorMessage = "Please confirm your email address before signing in.";
-      } else if (error.message) {
+      } else if (error instanceof Error && error.message) {
         errorMessage = error.message;
       }
       

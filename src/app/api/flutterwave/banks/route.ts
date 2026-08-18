@@ -22,11 +22,11 @@ export async function GET(request: Request) {
         error: result.message
       }, { status: 400 });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Banks API error:', error);
     return Response.json({
       success: false,
-      error: error.message || 'Failed to fetch banks'
+      error: error instanceof Error ? error.message : 'Failed to fetch banks'
     }, { status: 500 });
   }
 }

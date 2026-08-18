@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  envPrefix: ['VITE_', 'PAYSTACK_', 'FLUTTERWAVE_'],
   plugins: [react()],
   resolve: {
     alias: {

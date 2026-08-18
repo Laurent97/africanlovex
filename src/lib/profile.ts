@@ -81,46 +81,58 @@ export const searchProfiles = async (filters: {
   limit?: number
   offset?: number
 }): Promise<{ profiles: Profile[], total: number }> => {
+  console.log('searchProfiles called with filters:', filters); // Debug log
+  
   let query = supabase
     .from('profiles')
-    .select('*', { count: 'exact' })
+    .select('*')
 
   // Apply filters
   if (filters.country) {
+    console.log('Applying country filter:', filters.country);
     query = query.eq('country', filters.country)
   }
   
   if (filters.city) {
+    console.log('Applying city filter:', filters.city);
     query = query.eq('city', filters.city)
   }
   
   if (filters.age_min) {
+    console.log('Applying age_min filter:', filters.age_min);
     query = query.gte('age', filters.age_min)
   }
   
   if (filters.age_max) {
+    console.log('Applying age_max filter:', filters.age_max);
     query = query.lte('age', filters.age_max)
   }
   
   if (filters.gender) {
+    console.log('Applying gender filter:', filters.gender);
     query = query.eq('gender', filters.gender)
   }
   
   if (filters.interests && filters.interests.length > 0) {
+    console.log('Applying interests filter:', filters.interests);
     query = query.contains('interests', filters.interests)
   }
   
   if (filters.languages && filters.languages.length > 0) {
+    console.log('Applying languages filter:', filters.languages);
     query = query.contains('languages', filters.languages)
   }
   
   if (filters.relationship_intention) {
+    console.log('Applying relationship_intention filter:', filters.relationship_intention);
     query = query.eq('relationship_intention', filters.relationship_intention)
   }
-
+  
   // Pagination
   const limit = filters.limit || 20
   const offset = filters.offset || 0
+  
+  console.log('Final query parameters:', { limit, offset });
   
   query = query
     .range(offset, offset + limit - 1)
@@ -128,7 +140,18 @@ export const searchProfiles = async (filters: {
 
   const { data, error, count } = await query
 
-  if (error) throw error
+  console.log('Database query results:', { 
+    dataCount: data?.length || 0, 
+    error, 
+    totalCount: count || 0 
+  });
+
+  if (error) {
+    console.error('searchProfiles database error:', error);
+    throw error
+  }
+  
+  console.log('Returning profiles:', data || []);
   
   return {
     profiles: data || [],

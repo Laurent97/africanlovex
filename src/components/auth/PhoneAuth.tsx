@@ -9,7 +9,7 @@ import { Loader2, Phone, MessageCircle } from 'lucide-react'
 import { sendPhoneOTP, verifyPhoneOTP, phoneFormats } from '@/lib/auth'
 
 interface PhoneAuthProps {
-  onSuccess: (user: any) => void
+  onSuccess: (user: { id: string; email?: string }) => void
   onError: (error: string) => void
 }
 
@@ -34,8 +34,8 @@ export const PhoneAuth: React.FC<PhoneAuthProps> = ({ onSuccess, onError }) => {
       setSuccess(result.message)
       setSentPhone(result.phone)
       setStep('otp')
-    } catch (err: any) {
-      setError(err.message || 'Failed to send OTP')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send OTP')
     } finally {
       setLoading(false)
     }
@@ -51,12 +51,12 @@ export const PhoneAuth: React.FC<PhoneAuthProps> = ({ onSuccess, onError }) => {
         username: `user_${Date.now()}`,
         country: countryCode
       })
-      
+
       if (result.success) {
         onSuccess(result.user)
       }
-    } catch (err: any) {
-      setError(err.message || 'Invalid OTP code')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Invalid OTP code')
     } finally {
       setLoading(false)
     }

@@ -71,14 +71,6 @@ const Notifications = () => {
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Load notifications on mount and set up real-time subscription
-  useEffect(() => {
-    if (user) {
-      loadNotifications();
-      subscribeToNotifications();
-    }
-  }, [user]);
-
   // Update unread count whenever notifications change
   useEffect(() => {
     setUnreadCount(notifications.filter(n => !n.read).length);
@@ -518,6 +510,16 @@ const Notifications = () => {
       giftSubscription.unsubscribe();
     };
   };
+
+  // Load notifications on mount and set up real-time subscription
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+      const cleanup = subscribeToNotifications();
+      return cleanup;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const markAsRead = async (id: string) => {
     setNotifications(prev => prev.map(notif => 

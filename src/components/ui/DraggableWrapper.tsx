@@ -1,12 +1,12 @@
 import React, { useRef } from 'react';
-import Draggable, { DraggableProps } from 'react-draggable';
+import Draggable, { DraggableProps, DraggableData } from 'react-draggable';
 
 interface DraggableWrapperProps {
   children: React.ReactNode;
   handle?: string;
   position?: { x: number; y: number };
-  onStart?: (data: any) => void;
-  onStop?: (data: any) => void;
+  onStart?: (data: DraggableData) => void;
+  onStop?: (data: DraggableData) => void;
   disabled?: boolean;
   style?: React.CSSProperties;
 }
@@ -25,7 +25,7 @@ export const DraggableWrapper = ({
   const nodeRef = useRef<HTMLDivElement>(null);
 
   // Filter out unsupported props
-  const { defaultClassName, defaultStyle, ...draggableProps } = props as any;
+  const { defaultClassName, defaultStyle, ...draggableProps } = props as Partial<DraggableProps>;
 
   return (
     <Draggable

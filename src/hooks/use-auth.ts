@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 
 // Cache for profile data to avoid repeated queries
-const profileCache = new Map<string, { data: any; timestamp: number }>();
+const profileCache = new Map<string, { data: Record<string, unknown>; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Extended User interface to include all properties used in the app
@@ -139,9 +139,9 @@ export function useAuth() {
     }
 
     try {
-      // Add timeout with retry logic
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000) // Increased to 10 seconds
+      // Add timeout with retry logic (60s to allow Supabase free-tier cold starts to warm up)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 60000)
       );
 
       const profilePromise = supabase
@@ -150,7 +150,7 @@ export function useAuth() {
         .eq('id', user.id)
         .single();
 
-      const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]) as any;
+      const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]) as { data: Record<string, unknown> | null; error: Error | null };
       
       if (error) {
         // If profile doesn't exist, create a basic one
@@ -173,7 +173,7 @@ export function useAuth() {
             profileCache.set(user.id, { data: newProfile, timestamp: Date.now() });
             setAuthState({
               user,
-              userProfile: newProfile as AppUser,
+              userProfile: newProfile as unknown as AppUser,
               userRole: 'user',
               isLoading: false,
               isAuthenticated: true

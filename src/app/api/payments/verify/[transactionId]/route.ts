@@ -60,7 +60,7 @@ export async function GET(
 
     // Update only if status has changed
     if (ourTransaction.status !== newStatus) {
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status: newStatus,
         flutterwave_response: transactionData
       };

@@ -129,11 +129,11 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Payment initiation error:', error);
     return Response.json({
       success: false,
-      error: error.message || 'Internal server error'
+      error: error instanceof Error ? error.message : 'Internal server error'
     }, { status: 500 });
   }
 }

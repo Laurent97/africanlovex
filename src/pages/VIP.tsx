@@ -49,7 +49,7 @@ import {
   Bot,
   Brain,
   ZapIcon,
-  Infinity,
+  Infinity as InfinityIcon,
   MapPin,
   Calendar,
   Briefcase,
@@ -362,13 +362,6 @@ const VIP = () => {
     { id: 'crypto', name: 'Cryptocurrency', icon: <Wallet className="w-5 h-5" />, description: 'BTC, ETH, USDT' }
   ];
 
-  // Load user balance on mount
-  useEffect(() => {
-    if (user) {
-      loadUserBalance();
-    }
-  }, [user]);
-
   const loadUserBalance = async () => {
     try {
       const { data, error } = await supabase
@@ -383,6 +376,14 @@ const VIP = () => {
       console.error('Error loading balance:', error);
     }
   };
+
+  // Load user balance on mount
+  useEffect(() => {
+    if (user) {
+      loadUserBalance();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const getYearlyPrice = (monthlyPrice: number) => {
     return Math.round(monthlyPrice * 12 * 0.8 * 100) / 100; // 20% discount
@@ -473,6 +474,8 @@ const VIP = () => {
         return;
       } else {
         // Handle external payment methods
+        const durationDays = billingCycle === 'yearly' ? 365 : 30;
+
         const paymentData = {
           amount: finalPrice,
           currency: 'USD',
@@ -481,38 +484,31 @@ const VIP = () => {
           tx_ref: `vip_${currentPlan.id}_${Date.now()}`,
           payment_method: selectedPaymentMethod,
           meta: {
+            purpose: 'vip_subscription',
+            user_id: user?.id,
             planId: currentPlan.id,
+            tier: currentPlan.id,
             billingCycle,
+            durationDays,
             coinPrice: coinPrice
           }
         };
 
         const result = await paymentsApi.initiatePayment(paymentData);
         
-        if (result.status === 'success') {
-          // Redirect to payment page
-          if (result.data?.payment_link) {
-            window.location.href = result.data.payment_link;
-          } else {
-            throw new Error('Payment link not generated');
-          }
+        if (result.status === 'success' && (result.data as any)?.authorization_url) {
+          // Redirect to Paystack to complete payment
+          window.location.href = (result.data as any).authorization_url;
         } else {
-          throw new Error(result.message || 'Payment initiation failed');
+          throw new Error(result.message || 'Payment link not generated');
         }
-
-        setShowPaymentModal(false);
-        
-        // Redirect to profile after successful subscription
-        setTimeout(() => {
-          navigate('/profile');
-        }, 2000);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Payment error:', error);
       toast({
         title: "Payment Failed",
-        description: error.message || "There was an error processing your payment. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error processing your payment. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -520,12 +516,21 @@ const VIP = () => {
     }
   };
 
-  const handleMobileMoneySuccess = async (transaction: any) => {
+  const handleMobileMoneySuccess = async (transaction: { status: string; transaction_id: string; reference?: string }) => {
+    if (transaction.status !== 'success') {
+      toast({
+        title: "Payment Not Confirmed",
+        description: "We could not confirm your mobile money payment. Please try again.",
+        variant: "destructive",
+      });
+      setShowMobileMoneyPayment(false);
+      return;
+    }
+
     try {
       const currentPlan = plans.find(p => p.id === selectedPlan);
       if (!currentPlan) return;
 
-      // Credit user coins after successful mobile money payment
       const coinsToCredit = billingCycle === 'yearly' ? currentPlan.yearlyCoinPrice : currentPlan.coinPrice;
       
       // Update user balance
@@ -544,7 +549,7 @@ const VIP = () => {
           amount: coinsToCredit,
           transaction_type: 'purchase',
           description: `Mobile Money Payment - ${currentPlan.name} Plan`,
-          reference_id: transaction.transaction_id
+          reference_id: null
         });
 
       if (transactionError) throw transactionError;
@@ -575,11 +580,11 @@ const VIP = () => {
         navigate('/profile');
       }, 2000);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Mobile money success error:', error);
       toast({
         title: "Error Processing Subscription",
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Error processing subscription',
         variant: "destructive",
       });
     }
@@ -638,7 +643,7 @@ const VIP = () => {
     return 0;
   };
 
-  const getFeatureValue = (value: any) => {
+  const getFeatureValue = (value: unknown) => {
     if (typeof value === 'boolean') {
       return value ? (
         <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center mx-auto">

@@ -14,6 +14,39 @@ import { useAuth } from '../../hooks/use-auth';
 import { useVerification } from '../../hooks/use-verification';
 import { VerificationResult } from '../../types/verification';
 
+const processingSteps = [
+  {
+    icon: Camera,
+    title: 'Analyzing Photos',
+    description: 'Examining your captured images...',
+    duration: 2000
+  },
+  {
+    icon: Eye,
+    title: 'Face Detection',
+    description: 'Identifying facial features and landmarks...',
+    duration: 3000
+  },
+  {
+    icon: Brain,
+    title: 'AI Analysis',
+    description: 'Running advanced AI verification algorithms...',
+    duration: 4000
+  },
+  {
+    icon: Shield,
+    title: 'Security Check',
+    description: 'Performing liveness and anti-spoofing checks...',
+    duration: 3000
+  },
+  {
+    icon: CheckCircle,
+    title: 'Finalizing',
+    description: 'Completing verification process...',
+    duration: 2000
+  }
+];
+
 const VerificationProcessing: React.FC = () => {
   const { verificationId } = useParams<{ verificationId: string }>();
   const { user } = useAuth();
@@ -23,33 +56,6 @@ const VerificationProcessing: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const processingSteps = [
-    {
-      icon: Camera,
-      title: 'Analyzing Photos',
-      description: 'Examining your captured images...',
-      duration: 2000
-    },
-    {
-      icon: Eye,
-      title: 'Face Detection',
-      description: 'Identifying facial features and landmarks...',
-      duration: 3000
-    },
-    {
-      icon: Brain,
-      title: 'AI Verification',
-      description: 'Running advanced AI algorithms...',
-      duration: 4000
-    },
-    {
-      icon: Shield,
-      title: 'Security Check',
-      description: 'Performing anti-spoofing verification...',
-      duration: 2000
-    }
-  ];
 
   useEffect(() => {
     if (!verificationId) {
@@ -178,7 +184,7 @@ const VerificationProcessing: React.FC = () => {
     };
 
     processVerification();
-  }, [verificationId, checkStatus, navigate]);
+  }, [verificationId, checkStatus, navigate, processingSteps]);
 
   if (error) {
     return (

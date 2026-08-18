@@ -12,7 +12,7 @@ import {
   Gem,
   Star,
   Flower2,
-  Infinity,
+  Infinity as InfinityIcon,
   Coffee,
   Music,
   Award,

@@ -8,7 +8,7 @@ export interface MobileMoneyPayment {
   tx_ref: string;
   country: string;
   redirect_url?: string;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 export interface WithdrawalData {
@@ -29,7 +29,7 @@ export interface WithdrawalData {
 export interface FlutterwaveResponse {
   status: 'success' | 'error';
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 export class FlutterwaveService {
@@ -111,11 +111,11 @@ export class FlutterwaveService {
           data: data
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Flutterwave payment error:', error);
       return {
         status: 'error',
-        message: error.message || 'Payment initiation failed'
+        message: error instanceof Error ? error.message : 'Payment initiation failed'
       };
     }
   }
@@ -145,11 +145,11 @@ export class FlutterwaveService {
           data: data
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Flutterwave verification error:', error);
       return {
         status: 'error',
-        message: error.message || 'Transaction verification failed'
+        message: error instanceof Error ? error.message : 'Transaction verification failed'
       };
     }
   }
@@ -191,11 +191,11 @@ export class FlutterwaveService {
           data: data
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Flutterwave withdrawal error:', error);
       return {
         status: 'error',
-        message: error.message || 'Withdrawal initiation failed'
+        message: error instanceof Error ? error.message : 'Withdrawal initiation failed'
       };
     }
   }
@@ -225,11 +225,11 @@ export class FlutterwaveService {
           data: data
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Flutterwave transfer status error:', error);
       return {
         status: 'error',
-        message: error.message || 'Failed to get transfer status'
+        message: error instanceof Error ? error.message : 'Failed to get transfer status'
       };
     }
   }
@@ -259,11 +259,11 @@ export class FlutterwaveService {
           data: data
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Flutterwave banks error:', error);
       return {
         status: 'error',
-        message: error.message || 'Failed to retrieve banks'
+        message: error instanceof Error ? error.message : 'Failed to retrieve banks'
       };
     }
   }
@@ -299,11 +299,11 @@ export class FlutterwaveService {
           data: data
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Flutterwave account verification error:', error);
       return {
         status: 'error',
-        message: error.message || 'Account verification failed'
+        message: error instanceof Error ? error.message : 'Account verification failed'
       };
     }
   }
@@ -360,11 +360,11 @@ export class FlutterwaveService {
           data: data
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Flutterwave payment link error:', error);
       return {
         status: 'error',
-        message: error.message || 'Payment link creation failed'
+        message: error instanceof Error ? error.message : 'Payment link creation failed'
       };
     }
   }

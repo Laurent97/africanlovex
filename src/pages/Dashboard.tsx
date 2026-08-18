@@ -59,7 +59,7 @@ interface RecentActivity {
   userVerified: boolean;
   userVipTier?: string;
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
   read: boolean;
   actionable: boolean;
@@ -612,26 +612,6 @@ const Dashboard = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Load Data
-  useEffect(() => {
-    if (user) {
-      loadDashboardData();
-      setupRealtimeSubscriptions();
-      
-      // Check if first visit today
-      const lastVisit = localStorage.getItem('lastDashboardVisit');
-      const today = new Date().toDateString();
-      if (lastVisit !== today) {
-        setShowWelcome(true);
-        localStorage.setItem('lastDashboardVisit', today);
-      }
-    }
-    
-    return () => {
-      // Cleanup subscriptions
-    };
-  }, [user]);
-
   const loadDashboardData = async () => {
     setLoading(true);
     try {
@@ -660,6 +640,26 @@ const Dashboard = () => {
     await loadDashboardData();
     setRefreshing(false);
   };
+
+  // Load Data
+  useEffect(() => {
+    if (user) {
+      loadDashboardData();
+      setupRealtimeSubscriptions();
+
+      // Check if first visit today
+      const lastVisit = localStorage.getItem('lastDashboardVisit');
+      const today = new Date().toDateString();
+      if (lastVisit !== today) {
+        setShowWelcome(true);
+        localStorage.setItem('lastDashboardVisit', today);
+      }
+    }
+
+    return () => {
+      // Cleanup subscriptions
+    };
+  }, [user]);
 
   const loadUserProfile = async () => {
     if (!user) return;
@@ -911,7 +911,7 @@ const Dashboard = () => {
               values: compatibility.values,
               lifestyle: compatibility.lifestyle
             },
-            photos: profile.photos?.map((p: any) => p.url) || [],
+            photos: profile.photos?.map((p: { url: string }) => p.url) || [],
             bio: profile.bio,
             relationshipGoals: profile.relationship_goals,
             height: profile.height,
@@ -1001,7 +1001,7 @@ const Dashboard = () => {
   };
 
   // Helper Functions
-  const calculateProfileStrength = (profile: any): number => {
+  const calculateProfileStrength = (profile: Record<string, unknown>): number => {
     let score = 0;
     const weights = {
       full_name: 10,
@@ -1017,21 +1017,21 @@ const Dashboard = () => {
     };
 
     if (profile.full_name) score += weights.full_name;
-    if (profile.bio && profile.bio.length > 50) score += weights.bio;
+    if (profile.bio && typeof profile.bio === 'string' && profile.bio.length > 50) score += weights.bio;
     else if (profile.bio) score += weights.bio / 2;
-    
+
     if (profile.avatar_url) score += weights.avatar;
-    
-    const photoCount = profile.photos?.length || 0;
+
+    const photoCount = Array.isArray(profile.photos) ? profile.photos.length : 0;
     score += Math.min(photoCount * 5, weights.photos);
-    
-    const interestCount = profile.interests?.length || 0;
+
+    const interestCount = Array.isArray(profile.interests) ? profile.interests.length : 0;
     score += Math.min(interestCount * 2, weights.interests);
-    
+
     if (profile.age) score += weights.age;
     if (profile.city && profile.country) score += weights.location;
     else if (profile.city || profile.country) score += weights.location / 2;
-    
+
     if (profile.is_verified) score += weights.verified;
     if (profile.dating_preferences) score += weights.preferences;
     if (profile.social_links) score += weights.social_links;
@@ -1039,15 +1039,15 @@ const Dashboard = () => {
     return Math.min(Math.round((score / 100) * 100), 100);
   };
 
-  const calculateCompatibility = (user1: any, user2: any) => {
+  const calculateCompatibility = (user1: Record<string, unknown>, user2: Record<string, unknown>) => {
     // This is a simplified example - implement actual compatibility algorithm
     const personality = Math.floor(Math.random() * 30) + 70;
     const interests = Math.floor(Math.random() * 30) + 70;
     const values = Math.floor(Math.random() * 30) + 70;
     const lifestyle = Math.floor(Math.random() * 30) + 70;
-    
+
     const overall = Math.floor((personality + interests + values + lifestyle) / 4);
-    
+
     return { personality, interests, values, lifestyle, overall };
   };
 

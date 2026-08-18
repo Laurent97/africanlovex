@@ -171,7 +171,7 @@ export const ProfileEdit: React.FC<ProfileEditProps> = ({ onSave, onCancel }) =>
 
   const getProfileCompletion = () => {
     let completed = 0
-    let total = 8
+    const total = 8
 
     if (formData.username) completed++
     if (formData.full_name) completed++

@@ -147,11 +147,11 @@ export class FaceDetectionService {
     };
   }
 
-  private generateFallbackLandmarks(imageData: ImageData): any {
+  private generateFallbackLandmarks(imageData: ImageData): { positions: Array<{ x: number; y: number }> } {
     // Generate basic landmark positions
     const centerX = imageData.width / 2;
     const centerY = imageData.height / 2;
-    
+
     return {
       positions: Array.from({ length: 68 }, (_, i) => ({
         x: centerX + (Math.random() - 0.5) * 100,

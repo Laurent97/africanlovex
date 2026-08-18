@@ -1,4 +1,5 @@
-import { flutterwaveService, MobileMoneyPayment, WithdrawalData } from '@/services/flutterwave.service';
+import { paystackService, MobileMoneyPayment, WithdrawalData } from '@/services/paystack.service';
+import { supabase } from '@/lib/supabase';
 
 export interface PaymentInitiateRequest {
   amount: number;
@@ -7,7 +8,7 @@ export interface PaymentInitiateRequest {
   fullname: string;
   tx_ref: string;
   payment_method: string;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 export interface Bank {
@@ -18,7 +19,7 @@ export interface Bank {
 export interface PaymentResponse {
   status: 'success' | 'error';
   message: string;
-  data?: any;
+  data?: unknown;
 }
 
 class PaymentsApi {
@@ -27,29 +28,38 @@ class PaymentsApi {
    */
   async initiatePayment(paymentData: PaymentInitiateRequest): Promise<PaymentResponse> {
     try {
+      const userId = paymentData.meta?.user_id as string | undefined;
+      if (!userId) {
+        return {
+          status: 'error',
+          message: 'Missing user_id in payment metadata'
+        };
+      }
+
+      let result: PaymentResponse;
+
       // For mobile money payments
-      if (paymentData.payment_method.startsWith('mtn') || 
-          paymentData.payment_method.startsWith('airtel') || 
+      if (paymentData.payment_method.startsWith('mtn') ||
+          paymentData.payment_method.startsWith('airtel') ||
           paymentData.payment_method.startsWith('mpesa')) {
-        
+
         const mobileMoneyData: MobileMoneyPayment = {
           amount: paymentData.amount,
-          currency: paymentData.currency as any,
-          phone_number: '', // Will be provided by user in frontend
-          network: paymentData.payment_method.toUpperCase() as any,
+          currency: paymentData.currency as 'RWF' | 'UGX' | 'KES' | 'GHS' | 'NGN' | 'USD',
+          phone_number: paymentData.meta?.phone_number || '',
+          network: paymentData.payment_method.toUpperCase() as 'MTN' | 'AIRTEL' | 'MPESA',
           email: paymentData.email,
           fullname: paymentData.fullname,
           tx_ref: paymentData.tx_ref,
-          country: 'RW', // Default to Rwanda
+          country: (paymentData.meta?.country as string) || 'RW',
           meta: paymentData.meta
         };
 
-        return await flutterwaveService.initiateMobileMoneyPayment(mobileMoneyData);
-      } 
-      
+        result = await paystackService.initiateMobileMoneyPayment(mobileMoneyData);
+      }
       // For card payments, create payment link
       else if (paymentData.payment_method === 'card') {
-        return await flutterwaveService.createPaymentLink({
+        result = await paystackService.createPaymentLink({
           amount: paymentData.amount,
           currency: paymentData.currency,
           email: paymentData.email,
@@ -57,10 +67,9 @@ class PaymentsApi {
           tx_ref: paymentData.tx_ref
         });
       }
-      
       // Other payment methods
       else {
-        return await flutterwaveService.createPaymentLink({
+        result = await paystackService.createPaymentLink({
           amount: paymentData.amount,
           currency: paymentData.currency,
           email: paymentData.email,
@@ -68,10 +77,39 @@ class PaymentsApi {
           tx_ref: paymentData.tx_ref
         });
       }
-    } catch (error: any) {
+
+      if (result.status === 'success' && result.data) {
+        const data = result.data as any;
+        const reference = data.reference || data.transaction_id || paymentData.tx_ref;
+
+        // Persist the pending transaction so the callback can verify and fulfill it
+        const { error: insertError } = await supabase.from('payment_transactions').insert({
+          user_id: userId,
+          transaction_id: reference,
+          amount: paymentData.amount,
+          currency: paymentData.currency,
+          status: 'pending',
+          payment_method: paymentData.payment_method,
+          provider: 'paystack',
+          metadata: {
+            ...(paymentData.meta || {}),
+            purpose: (paymentData.meta?.purpose as string) || 'general',
+            paystack_reference: reference,
+            authorization_url: data.authorization_url || data.payment_link || data.link,
+            initialized_at: new Date().toISOString()
+          }
+        });
+
+        if (insertError) {
+          console.error('Failed to record payment transaction:', insertError);
+        }
+      }
+
+      return result;
+    } catch (error: unknown) {
       return {
         status: 'error',
-        message: error.message || 'Payment initiation failed'
+        message: error instanceof Error ? error.message : 'Payment initiation failed'
       };
     }
   }
@@ -81,11 +119,11 @@ class PaymentsApi {
    */
   async verifyTransaction(txRef: string): Promise<PaymentResponse> {
     try {
-      return await flutterwaveService.verifyTransaction(txRef);
-    } catch (error: any) {
+      return await paystackService.verifyTransaction(txRef);
+    } catch (error: unknown) {
       return {
         status: 'error',
-        message: error.message || 'Transaction verification failed'
+        message: error instanceof Error ? error.message : 'Transaction verification failed'
       };
     }
   }
@@ -95,11 +133,11 @@ class PaymentsApi {
    */
   async withdraw(withdrawalData: WithdrawalData): Promise<PaymentResponse> {
     try {
-      return await flutterwaveService.initiateWithdrawal(withdrawalData);
-    } catch (error: any) {
+      return await paystackService.initiateWithdrawal(withdrawalData);
+    } catch (error: unknown) {
       return {
         status: 'error',
-        message: error.message || 'Withdrawal initiation failed'
+        message: error instanceof Error ? error.message : 'Withdrawal initiation failed'
       };
     }
   }
@@ -109,11 +147,11 @@ class PaymentsApi {
    */
   async getWithdrawalStatus(transferId: string): Promise<PaymentResponse> {
     try {
-      return await flutterwaveService.getTransferStatus(transferId);
-    } catch (error: any) {
+      return await paystackService.getTransferStatus(transferId);
+    } catch (error: unknown) {
       return {
         status: 'error',
-        message: error.message || 'Failed to get withdrawal status'
+        message: error instanceof Error ? error.message : 'Failed to get withdrawal status'
       };
     }
   }
@@ -138,10 +176,10 @@ class PaymentsApi {
           message: data.error || 'Failed to retrieve banks'
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         status: 'error',
-        message: error.message || 'Failed to retrieve banks'
+        message: error instanceof Error ? error.message : 'Failed to retrieve banks'
       };
     }
   }
@@ -151,11 +189,11 @@ class PaymentsApi {
    */
   async verifyAccount(accountNumber: string, bankCode: string): Promise<PaymentResponse> {
     try {
-      return await flutterwaveService.verifyAccount(accountNumber, bankCode);
-    } catch (error: any) {
+      return await paystackService.verifyAccount(accountNumber, bankCode);
+    } catch (error: unknown) {
       return {
         status: 'error',
-        message: error.message || 'Account verification failed'
+        message: error instanceof Error ? error.message : 'Account verification failed'
       };
     }
   }

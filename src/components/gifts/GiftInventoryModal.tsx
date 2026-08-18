@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Gift, 
@@ -51,14 +51,7 @@ const GiftInventoryModal: React.FC<GiftInventoryModalProps> = ({ isOpen, onClose
   const [loading, setLoading] = useState(true);
   const [userCoins, setUserCoins] = useState(0);
 
-  useEffect(() => {
-    if (isOpen && user) {
-      loadInventory();
-      loadUserCoins();
-    }
-  }, [isOpen, user]);
-
-  const loadInventory = async () => {
+  const loadInventory = useCallback(async () => {
     if (!user) return;
     
     setLoading(true);
@@ -76,9 +69,9 @@ const GiftInventoryModal: React.FC<GiftInventoryModalProps> = ({ isOpen, onClose
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const loadUserCoins = async () => {
+  const loadUserCoins = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -92,7 +85,14 @@ const GiftInventoryModal: React.FC<GiftInventoryModalProps> = ({ isOpen, onClose
     } catch (error) {
       console.error('Error loading coins:', error);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      loadInventory();
+      loadUserCoins();
+    }
+  }, [isOpen, user, loadInventory, loadUserCoins]);
 
   const getRarityColor = (rarity: string) => {
     switch (rarity) {

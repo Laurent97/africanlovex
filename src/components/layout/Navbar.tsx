@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { createClient } from '@supabase/supabase-js';
@@ -35,10 +35,10 @@ export const Navbar = () => {
   const navigate = useNavigate();
 
   // Initialize Supabase client
-  const supabase = createClient(
+  const supabase = useMemo(() => createClient(
     import.meta.env.VITE_SUPABASE_URL,
     import.meta.env.VITE_SUPABASE_ANON_KEY
-  );
+  ), []);
 
   const handleSignOut = async () => {
     await signOut();
@@ -58,15 +58,7 @@ export const Navbar = () => {
     setSearchQuery(value);
   };
 
-  // Load notification counts
-  useEffect(() => {
-    if (user) {
-      loadNotificationCounts();
-      setupRealtimeSubscriptions();
-    }
-  }, [user]);
-
-  const loadNotificationCounts = async () => {
+  const loadNotificationCounts = useCallback(async () => {
     try {
       // Load unread notifications
       const { count: notificationCount } = await supabase
@@ -90,9 +82,9 @@ export const Navbar = () => {
       setUnreadNotifications(0);
       setUnreadMessages(0);
     }
-  };
+  }, [user?.id, supabase]);
 
-  const setupRealtimeSubscriptions = () => {
+  const setupRealtimeSubscriptions = useCallback(() => {
     // Subscribe to new notifications
     const notificationSubscription = supabase
       .channel('navbar-notifications')
@@ -113,7 +105,22 @@ export const Navbar = () => {
     return () => {
       supabase.removeChannel(notificationSubscription);
     };
-  };
+  }, [user?.id, supabase]);
+
+  // Load notification counts
+  useEffect(() => {
+    if (user) {
+      loadNotificationCounts();
+    }
+  }, [user, loadNotificationCounts]);
+
+  // Setup realtime subscriptions
+  useEffect(() => {
+    if (user) {
+      const cleanup = setupRealtimeSubscriptions();
+      return cleanup;
+    }
+  }, [user, setupRealtimeSubscriptions]);
 
   return (
     <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-30 pt-safe">

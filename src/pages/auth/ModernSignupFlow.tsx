@@ -276,57 +276,63 @@ const ModernSignupFlow: React.FC = () => {
     }));
   };
 
-  const saveStepData = (stepData: any) => {
+  const saveStepData = (stepData: Record<string, unknown>) => {
     setSignupData(prev => ({ ...prev, ...stepData, onboardingStep: currentStep }));
   };
 
   const validateAndProceed = async () => {
     let isValid = false;
-    let stepData: any = {};
+    let stepData: Record<string, unknown> = {};
 
     switch (currentStep) {
-      case 1:
+      case 1: {
         const step1Result = await step1Form.trigger();
         if (step1Result) {
           stepData = step1Form.getValues();
           isValid = true;
         }
         break;
-      case 2:
+      }
+      case 2: {
         const step2Result = await step2Form.trigger();
         if (step2Result) {
           stepData = step2Form.getValues();
           isValid = true;
         }
         break;
-      case 3:
+      }
+      case 3: {
         const step3Result = await step3Form.trigger();
         if (step3Result) {
           stepData = step3Form.getValues();
           isValid = true;
         }
         break;
-      case 4:
+      }
+      case 4: {
         const step4Result = await step4Form.trigger();
         if (step4Result) {
           stepData = step4Form.getValues();
           isValid = true;
         }
         break;
-      case 5:
+      }
+      case 5: {
         const step5Result = await step5Form.trigger();
         if (step5Result) {
           stepData = step5Form.getValues();
           isValid = true;
         }
         break;
-      case 6:
+      }
+      case 6: {
         const step6Result = await step6Form.trigger();
         if (step6Result) {
           stepData = step6Form.getValues();
           isValid = true;
         }
         break;
+      }
     }
 
     if (isValid) {
@@ -388,12 +394,12 @@ const ModernSignupFlow: React.FC = () => {
 
         navigate('/verification');
       }
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       console.error('Signup error:', error);
       toast({
         title: "Signup failed",
-        description: error.message || "An error occurred during signup. Please try again.",
+        description: error instanceof Error ? error.message : "An error occurred during signup. Please try again.",
         variant: "destructive",
       });
     } finally {

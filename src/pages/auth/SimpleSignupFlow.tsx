@@ -367,12 +367,12 @@ const SimpleSignupFlow: React.FC = () => {
 
         navigate('/verification');
       }
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       console.error('Signup error:', error);
       toast({
         title: "Signup failed",
-        description: error.message || "An error occurred during signup. Please try again.",
+        description: error instanceof Error ? error.message : "An error occurred during signup. Please try again.",
         variant: "destructive",
       });
     } finally {

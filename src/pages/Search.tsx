@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
@@ -28,7 +28,7 @@ import {
   UsersRound,
   HeartPulse,
   Gem,
-  Infinity,
+  Infinity as InfinityIcon,
   Sparkle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -91,25 +91,6 @@ const Discover = () => {
 
   // Real search results from database
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
-
-  // Load search results from database
-  useEffect(() => {
-    loadSearchResults();
-  }, [user, ageRange, maxDistance, selectedInterests, relationshipIntention, verifiedOnly, onlineOnly, vipOnly, genderFilter]);
-
-  // Update active filter count
-  useEffect(() => {
-    let count = 0;
-    if (ageRange[0] !== 18 || ageRange[1] !== 50) count++;
-    if (maxDistance[0] !== 50) count++;
-    if (selectedInterests.length > 0) count++;
-    if (relationshipIntention !== 'all') count++;
-    if (verifiedOnly) count++;
-    if (onlineOnly) count++;
-    if (vipOnly) count++;
-    if (genderFilter !== 'all') count++;
-    setActiveFilterCount(count);
-  }, [ageRange, maxDistance, selectedInterests, relationshipIntention, verifiedOnly, onlineOnly, vipOnly, genderFilter]);
 
   const loadSearchResults = async () => {
     if (!user) return;
@@ -187,8 +168,27 @@ const Discover = () => {
     }
   };
 
+  // Load search results from database
+  useEffect(() => {
+    loadSearchResults();
+  }, [user, ageRange, maxDistance, selectedInterests, relationshipIntention, verifiedOnly, onlineOnly, vipOnly, genderFilter]);
+
+  // Update active filter count
+  useEffect(() => {
+    let count = 0;
+    if (ageRange[0] !== 18 || ageRange[1] !== 50) count++;
+    if (maxDistance[0] !== 50) count++;
+    if (selectedInterests.length > 0) count++;
+    if (relationshipIntention !== 'all') count++;
+    if (verifiedOnly) count++;
+    if (onlineOnly) count++;
+    if (vipOnly) count++;
+    if (genderFilter !== 'all') count++;
+    setActiveFilterCount(count);
+  }, [ageRange, maxDistance, selectedInterests, relationshipIntention, verifiedOnly, onlineOnly, vipOnly, genderFilter]);
+
   // Helper functions
-  const calculateDistance = (user1: any, user2: any): number => {
+  const calculateDistance = (user1: Record<string, unknown>, user2: Record<string, unknown>): number => {
     // Simple distance calculation - in real app, use geolocation
     if (!user1?.location || !user2?.location) return Math.floor(Math.random() * 100);
     return Math.floor(Math.random() * 100);
@@ -229,16 +229,16 @@ const Discover = () => {
     return labels[intention] || 'Open to All 🌟';
   };
 
-  const calculateMatchPercentage = (user1: any, user2: any): number => {
+  const calculateMatchPercentage = (user1: Record<string, unknown>, user2: Record<string, unknown>): number => {
     // Simple match calculation - in real app, use sophisticated algorithm
     if (!user1 || !user2) return Math.floor(Math.random() * 40) + 50;
-    
+
     let score = 50; // Base score
-    
+
     // Add points for common interests
-    const user1Interests = user1.interests || [];
-    const user2Interests = user2.interests || [];
-    const commonInterests = user1Interests.filter((interest: string) => 
+    const user1Interests = Array.isArray(user1.interests) ? user1.interests : [];
+    const user2Interests = Array.isArray(user2.interests) ? user2.interests : [];
+    const commonInterests = user1Interests.filter((interest: string) =>
       user2Interests.includes(interest)
     ).length;
     score += commonInterests * 5;
@@ -588,7 +588,7 @@ const Discover = () => {
                         {sortOptions.map((option) => (
                           <button
                             key={option.value}
-                            onClick={() => setSortBy(option.value as any)}
+                            onClick={() => setSortBy(option.value as 'match' | 'distance' | 'newest' | 'online' | 'verified')}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
                               sortBy === option.value
                                 ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md'
@@ -785,7 +785,7 @@ const Discover = () => {
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                             Sort By
                           </label>
-                          <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                          <Select value={sortBy} onValueChange={(value: 'match' | 'distance' | 'newest' | 'online' | 'verified') => setSortBy(value)}>
                             <SelectTrigger className="w-full bg-gray-100 dark:bg-gray-800 border-0">
                               <SelectValue />
                             </SelectTrigger>

@@ -67,7 +67,7 @@ import {
   Bot,
   Brain,
   ZapIcon,
-  Infinity,
+  Infinity as InfinityIcon,
   Globe,
   MapPin,
   Palette,
@@ -137,7 +137,7 @@ const GiftIcons = {
   loveLetter: <Package className="w-8 h-8 text-purple-500 drop-shadow-[0_4px_6px_rgba(128,0,128,0.3)]" />,
   cupidArrow: <Zap className="w-8 h-8 text-yellow-500 drop-shadow-[0_4px_6px_rgba(255,215,0,0.3)]" />,
   promiseRing: <Diamond className="w-8 h-8 text-blue-500 drop-shadow-[0_4px_6px_rgba(0,0,255,0.3)]" />,
-  infinityHeart: <Infinity className="w-8 h-8 text-pink-600 drop-shadow-[0_4px_6px_rgba(255,20,147,0.3)]" />,
+  infinityHeart: <InfinityIcon className="w-8 h-8 text-pink-600 drop-shadow-[0_4px_6px_rgba(255,20,147,0.3)]" />,
   
   // Premium Gifts
   shootingStar: <Star className="w-8 h-8 text-yellow-400 drop-shadow-[0_4px_6px_rgba(255,215,0,0.4)]" />,
@@ -878,28 +878,29 @@ const Gifts = () => {
   };
 
   const handleMobileMoneySuccess = async (transaction: any) => {
-    // Credit user coins after successful mobile money payment
-    try {
-      const response = await fetch('/api/payments/verify/' + transaction.transaction_id, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
+    // Only process if Paystack verification confirmed the money was received
+    if (!transaction || transaction.status !== 'success') {
+      toast({
+        title: "Payment Not Confirmed",
+        description: "We could not confirm your payment. Please try again.",
+        variant: "destructive",
       });
-      
-      if (response.ok) {
-        const newBalance = balance + coinsNeeded;
-        await updateBalance(newBalance);
-        
-        // Process the original gift purchase
-        setIsProcessing(true);
-        
-        // Simulate API call for gift purchase
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const finalBalance = newBalance - getTotalPrice();
-        await updateBalance(finalBalance);
-        
-        // Add purchased gifts to inventory
-        for (const item of cart) {
+      setShowMobileMoneyPayment(false);
+      return;
+    }
+
+    try {
+      const newBalance = balance + coinsNeeded;
+      await updateBalance(newBalance);
+
+      // Process the original gift purchase
+      setIsProcessing(true);
+
+      const finalBalance = newBalance - getTotalPrice();
+      await updateBalance(finalBalance);
+
+      // Add purchased gifts to inventory
+      for (const item of cart) {
           const gift = gifts.find(g => g.id === item.id);
           if (gift) {
             await supabase.rpc('add_gift_to_inventory', {
@@ -963,7 +964,6 @@ const Gifts = () => {
         });
         
         setIsProcessing(false);
-      }
     } catch (error) {
       toast({
         title: "Error",

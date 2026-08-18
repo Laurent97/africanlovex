@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -75,6 +75,47 @@ export const LiveRoomInterface: React.FC<LiveRoomInterfaceProps> = ({
   const chatEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
 
+  const loadRoom = useCallback(async () => {
+    try {
+      const user = await getCurrentUser()
+      if (!user) {
+        setError('You must be logged in to join live rooms')
+        return
+      }
+
+      const roomDetails = await getRoomDetails(roomId)
+      setRoom(roomDetails.room)
+      setHost(roomDetails.host)
+      setIsHost(roomDetails.host.id === user.id)
+
+      setLoading(false)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to load room')
+      setLoading(false)
+    }
+  }, [roomId])
+
+  const handleLeave = useCallback(async () => {
+    try {
+      const user = await getCurrentUser()
+      if (!user) return
+
+      await leaveLiveRoom(user.id, roomId)
+      setIsJoined(false)
+      setViewerCount(prev => Math.max(0, prev - 1))
+
+      // Record viewing time for private rooms
+      if (room?.cost_per_minute && viewingStartTime) {
+        const minutes = Math.ceil((Date.now() - viewingStartTime.getTime()) / 1000 / 60)
+        await recordRoomViewTime(user.id, roomId, minutes)
+      }
+
+      onLeave?.()
+    } catch (error: unknown) {
+      console.error('Error leaving room:', error)
+    }
+  }, [roomId, room, viewingStartTime, onLeave])
+
   useEffect(() => {
     loadRoom()
     return () => {
@@ -82,7 +123,7 @@ export const LiveRoomInterface: React.FC<LiveRoomInterfaceProps> = ({
         handleLeave()
       }
     }
-  }, [roomId])
+  }, [roomId, loadRoom, handleLeave, isJoined])
 
   useEffect(() => {
     // Auto-scroll to bottom of chat
@@ -102,26 +143,6 @@ export const LiveRoomInterface: React.FC<LiveRoomInterfaceProps> = ({
       return () => clearInterval(interval)
     }
   }, [isJoined, room, viewingStartTime])
-
-  const loadRoom = async () => {
-    try {
-      const user = await getCurrentUser()
-      if (!user) {
-        setError('You must be logged in to join live rooms')
-        return
-      }
-
-      const roomDetails = await getRoomDetails(roomId)
-      setRoom(roomDetails.room)
-      setHost(roomDetails.host)
-      setIsHost(roomDetails.host.id === user.id)
-
-      setLoading(false)
-    } catch (error: any) {
-      setError(error.message)
-      setLoading(false)
-    }
-  }
 
   const handleJoin = async () => {
     if (!room) return
@@ -148,33 +169,11 @@ export const LiveRoomInterface: React.FC<LiveRoomInterfaceProps> = ({
         }
         setMessages(prev => [...prev, joinMessage])
       }
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to join room')
     }
   }
 
-  const handleLeave = async () => {
-    if (!isJoined) return
-
-    try {
-      const user = await getCurrentUser()
-      if (!user) return
-
-      await leaveLiveRoom(user.id, roomId)
-      setIsJoined(false)
-      setViewerCount(prev => Math.max(0, prev - 1))
-
-      // Record viewing time for private rooms
-      if (room?.cost_per_minute && viewingStartTime) {
-        const minutes = Math.ceil((Date.now() - viewingStartTime.getTime()) / 1000 / 60)
-        await recordRoomViewTime(user.id, roomId, minutes)
-      }
-
-      onLeave?.()
-    } catch (error: any) {
-      console.error('Error leaving room:', error)
-    }
-  }
 
   const handleEndRoom = async () => {
     if (!isHost) return
@@ -185,8 +184,8 @@ export const LiveRoomInterface: React.FC<LiveRoomInterfaceProps> = ({
 
       await endLiveRoom(user.id, roomId)
       onLeave?.()
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Failed to end room')
     }
   }
 
@@ -219,12 +218,12 @@ export const LiveRoomInterface: React.FC<LiveRoomInterfaceProps> = ({
 
       setMessages(prev => [...prev, message])
       setNewMessage('')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error sending message:', error)
     }
   }
 
-  const handleGiftSent = (gift: any) => {
+  const handleGiftSent = (gift: Record<string, unknown>) => {
     // Add gift message to chat
     const user = getCurrentUser()
     if (!user) return

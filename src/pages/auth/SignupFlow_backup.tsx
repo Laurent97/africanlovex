@@ -313,11 +313,11 @@ const SignupFlow: React.FC = () => {
       // Navigate to verification
       navigate('/verification');
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Signup error:', error);
       toast({
         title: "Signup failed",
-        description: error.message || "An error occurred during signup. Please try again.",
+        description: error instanceof Error ? error.message : "An error occurred during signup. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -674,7 +674,7 @@ const SignupFlow: React.FC = () => {
                     <SelectItem value="serious_only">Serious Relationship Only</SelectItem>
                     <SelectItem value="friends_first">Friends First</SelectItem>
                     <SelectItem value="casual_dating">Casual Dating</SelectItem>
-                    <SelectItem="sugar_daddy">Sugar Daddy</SelectItem>
+                    <SelectItem value="sugar_daddy">Sugar Daddy</SelectItem>
                     <SelectItem value="sugar_mommy">Sugar Mommy</SelectItem>
                   </SelectContent>
                 </Select>

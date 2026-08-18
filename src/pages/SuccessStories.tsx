@@ -15,7 +15,7 @@ import {
   Crown,
   Diamond,
   Flower2,
-  Infinity,
+  Infinity as InfinityIcon,
   Coffee,
   Camera,
   Music,

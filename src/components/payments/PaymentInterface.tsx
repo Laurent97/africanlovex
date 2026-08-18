@@ -29,7 +29,7 @@ import {
 import { getCurrentUser } from '@/lib/auth'
 
 interface PaymentInterfaceProps {
-  onPaymentComplete?: (result: any) => void
+  onPaymentComplete?: (result: { success: boolean; transactionId?: string; message?: string }) => void
   onCancel?: () => void
   defaultAmount?: number
   defaultType?: 'coins' | 'subscription'
@@ -128,8 +128,8 @@ export const PaymentInterface: React.FC<PaymentInterfaceProps> = ({
         setError(result.message || 'Payment failed')
         setPaymentStep('method')
       }
-    } catch (error: any) {
-      setError(error.message)
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : 'Payment failed')
       setPaymentStep('method')
     } finally {
       setLoading(false)
@@ -250,7 +250,7 @@ export const PaymentInterface: React.FC<PaymentInterfaceProps> = ({
               <CardTitle>What would you like to purchase?</CardTitle>
             </CardHeader>
             <CardContent>
-              <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)}>
+              <RadioGroup value={paymentType} onValueChange={(value: 'coins' | 'subscription') => setPaymentType(value)}>
                 <div className="grid grid-cols-2 gap-4">
                   <Label htmlFor="coins" className="flex items-center space-x-3 cursor-pointer">
                     <RadioGroupItem value="coins" id="coins" />
@@ -280,7 +280,7 @@ export const PaymentInterface: React.FC<PaymentInterfaceProps> = ({
               <CardTitle>Select Your Country</CardTitle>
             </CardHeader>
             <CardContent>
-              <Select value={selectedCountry} onValueChange={(value: any) => setSelectedCountry(value)}>
+              <Select value={selectedCountry} onValueChange={(value: 'RW' | 'KE' | 'UG' | 'TZ' | 'BI' | 'CD') => setSelectedCountry(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -391,7 +391,7 @@ export const PaymentInterface: React.FC<PaymentInterfaceProps> = ({
               <CardTitle>Payment Method</CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs value={paymentStep} onValueChange={(value: any) => setPaymentStep(value)}>
+              <Tabs value={paymentStep} onValueChange={(value: 'method' | 'details' | 'processing' | 'complete') => setPaymentStep(value)}>
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="method">Select Method</TabsTrigger>
                   <TabsTrigger value="details">Payment Details</TabsTrigger>

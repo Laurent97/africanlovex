@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Package, 
@@ -69,14 +69,7 @@ const GiftInventory: React.FC = () => {
   const [giftMessage, setGiftMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadInventory();
-      loadTransactions();
-    }
-  }, [user]);
-
-  const loadInventory = async () => {
+  const loadInventory = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('gift_inventory')
@@ -89,9 +82,9 @@ const GiftInventory: React.FC = () => {
     } catch (error) {
       console.error('Error loading inventory:', error);
     }
-  };
+  }, [user?.id]);
 
-  const loadTransactions = async () => {
+  const loadTransactions = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('gift_transactions')
@@ -105,7 +98,14 @@ const GiftInventory: React.FC = () => {
     } catch (error) {
       console.error('Error loading transactions:', error);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (user) {
+      loadInventory();
+      loadTransactions();
+    }
+  }, [user, loadInventory, loadTransactions]);
 
   const getRarityColor = (rarity: string) => {
     switch (rarity) {

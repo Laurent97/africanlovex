@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -29,7 +29,7 @@ const VerificationCapture: React.FC = () => {
   const [poses, setPoses] = useState<VerificationPose[]>([]);
 
   // Default poses if not loaded from database
-  const defaultPoses: PoseType[] = ['neutral', 'left', 'right', 'smile', 'wink'];
+  const defaultPoses: PoseType[] = useMemo(() => ['neutral', 'left', 'right', 'smile', 'wink'], []);
 
   useEffect(() => {
     // Load poses from database or use defaults
@@ -56,7 +56,7 @@ const VerificationCapture: React.FC = () => {
     };
 
     loadPoses();
-  }, []);
+  }, [defaultPoses]);
 
   const currentPose = poses[currentPoseIndex]?.pose_key || defaultPoses[currentPoseIndex];
   const currentInstruction = POSE_INSTRUCTIONS[currentPose];

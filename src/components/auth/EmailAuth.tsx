@@ -10,7 +10,7 @@ import { Loader2, Mail, Lock, User } from 'lucide-react'
 import { signUpWithEmail, signInWithEmail, checkUsernameAvailability } from '@/lib/auth'
 
 interface EmailAuthProps {
-  onSuccess: (user: any) => void
+  onSuccess: (user: { id: string; email?: string }) => void
   onError: (error: string) => void
 }
 
@@ -88,14 +88,14 @@ export const EmailAuth: React.FC<EmailAuthProps> = ({ onSuccess, onError }) => {
         country: signupData.country,
         age: parseInt(signupData.age),
         gender: signupData.gender
-      } as any)
+      } as Record<string, unknown>)
 
       if (result.success) {
         setSuccess('Account created successfully! Please check your email to verify.')
         onSuccess(result.user)
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to create account')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create account')
     } finally {
       setLoading(false)
     }
@@ -112,8 +112,8 @@ export const EmailAuth: React.FC<EmailAuthProps> = ({ onSuccess, onError }) => {
       if (result.success) {
         onSuccess(result.user)
       }
-    } catch (err: any) {
-      setError(err.message || 'Invalid email or password')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Invalid email or password')
     } finally {
       setLoading(false)
     }

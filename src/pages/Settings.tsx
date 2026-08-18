@@ -203,7 +203,7 @@ interface Preferences {
   ageRangeMin: number;
   ageRangeMax: number;
   showMe: 'everyone' | 'men' | 'women';
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface BlockedUser {
@@ -403,17 +403,6 @@ const Settings = () => {
   const [twoFactorBackupCodes, setTwoFactorBackupCodes] = useState<string[]>([]);
   const [twoFactorStep, setTwoFactorStep] = useState<'setup' | 'verify' | 'backup'>('setup');
 
-  // Load user data on mount
-  useEffect(() => {
-    if (user) {
-      loadUserData();
-      loadSettings();
-      loadConnectedApps();
-      loadBlockedUsers();
-      loadActiveSessions();
-    }
-  }, [user]);
-
   const loadUserData = async () => {
     try {
       // Get user from auth
@@ -509,7 +498,7 @@ const Settings = () => {
         .from('user_notification_settings')
         .select('*')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
 
       if (notifData) {
         setNotifications(prev => ({ ...prev, ...notifData }));
@@ -520,7 +509,7 @@ const Settings = () => {
         .from('user_privacy_settings')
         .select('*')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
 
       if (privacyData) {
         setPrivacy(prev => ({ ...prev, ...privacyData }));
@@ -531,7 +520,7 @@ const Settings = () => {
         .from('user_preferences')
         .select('*')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
 
       if (prefData) {
         setPreferences(prev => ({ ...prev, ...prefData }));
@@ -619,6 +608,17 @@ const Settings = () => {
       console.error('Error loading sessions:', error);
     }
   };
+
+  // Load user data on mount
+  useEffect(() => {
+    if (user) {
+      loadUserData();
+      loadSettings();
+      loadConnectedApps();
+      loadBlockedUsers();
+      loadActiveSessions();
+    }
+  }, [user]);
 
   const handleConnectApp = async (appId: string) => {
     const app = connectedApps.find(a => a.id === appId);
@@ -749,7 +749,7 @@ const Settings = () => {
           user_id: user?.id,
           ...notifications,
           updated_at: new Date().toISOString()
-        });
+        }, { onConflict: 'user_id' });
 
       // Save privacy settings
       await supabase
@@ -758,7 +758,7 @@ const Settings = () => {
           user_id: user?.id,
           ...privacy,
           updated_at: new Date().toISOString()
-        });
+        }, { onConflict: 'user_id' });
 
       // Save preferences
       await supabase
@@ -767,7 +767,7 @@ const Settings = () => {
           user_id: user?.id,
           ...preferences,
           updated_at: new Date().toISOString()
-        });
+        }, { onConflict: 'user_id' });
 
       toast({
         title: "Settings Saved",
@@ -1924,9 +1924,9 @@ const Settings = () => {
 
                           <div>
                             <Label htmlFor="showMe" className="text-sm">Show Me</Label>
-                            <Select 
-                              value={preferences.showMe} 
-                              onValueChange={(value: any) => setPreferences({ ...preferences, showMe: value })}
+                            <Select
+                              value={preferences.showMe}
+                              onValueChange={(value: 'everyone' | 'men' | 'women') => setPreferences({ ...preferences, showMe: value })}
                             >
                               <SelectTrigger className="mt-1.5 border-gray-300">
                                 <SelectValue />

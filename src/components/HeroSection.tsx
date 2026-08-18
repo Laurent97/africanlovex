@@ -1,4 +1,4 @@
-import { Heart, Sparkles, Globe, Shield, Gift, Video, Crown, Star, ChevronRight, MessageCircle, Users, Zap, Diamond, Gem, Infinity, Feather, Flower2, Coffee, Music, Award, Flame } from "lucide-react";
+import { Heart, Sparkles, Globe, Shield, Gift, Video, Crown, Star, ChevronRight, MessageCircle, Users, Zap, Diamond, Gem, Infinity as InfinityIcon, Feather, Flower2, Coffee, Music, Award, Flame } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
@@ -271,7 +271,7 @@ export default function HeroSection() {
               { icon: <Crown className="w-4 h-4 text-amber-300" />, tooltip: "Royal Crown" },
               { icon: <Star className="w-4 h-4 text-yellow-300" />, tooltip: "Shooting Star" },
               { icon: <Flower2 className="w-4 h-4 text-pink-300" />, tooltip: "Eternal Rose" },
-              { icon: <Infinity className="w-4 h-4 text-indigo-300" />, tooltip: "Infinity Heart" },
+              { icon: <InfinityIcon className="w-4 h-4 text-indigo-300" />, tooltip: "Infinity Heart" },
             ].map((gift, i) => (
               <motion.div
                 key={i}

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { paymentsApi } from '@/api/payments';
+import { supabase } from '@/lib/supabase';
 
 const PaymentCallback = () => {
   const [searchParams] = useSearchParams();
@@ -16,45 +17,196 @@ const PaymentCallback = () => {
 
   useEffect(() => {
     const handlePaymentCallback = async () => {
-      const txRef = searchParams.get('tx_ref');
-      const status = searchParams.get('status');
-      const transactionId = searchParams.get('transaction_id');
+      // Paystack returns either `reference` or `trxref`
+      const reference = searchParams.get('reference') || searchParams.get('trxref');
+      const statusParam = searchParams.get('status');
 
-      if (!txRef) {
+      if (!reference) {
         setStatus('failed');
         setMessage('Invalid payment reference');
         return;
       }
 
       try {
-        if (status === 'successful') {
-          // Verify the transaction with Flutterwave
-          const verification = await paymentsApi.verifyTransaction(txRef);
-          
-          if (verification.status === 'success' && verification.data?.status === 'successful') {
-            setStatus('success');
-            setMessage('Payment completed successfully! Your coins have been added to your wallet.');
-            
-            toast({
-              title: "Payment Successful! 🎉",
-              description: "Your coins have been added to your wallet.",
-            });
-          } else {
-            setStatus('failed');
-            setMessage('Payment verification failed. Please contact support.');
-          }
-        } else if (status === 'failed') {
+        // If Paystack already tells us it failed, we can short-circuit
+        if (statusParam === 'failed' || statusParam === 'cancelled') {
           setStatus('failed');
           setMessage('Payment was not successful. Please try again.');
+          return;
+        }
+
+        // Verify the transaction with Paystack
+        const verification = await paymentsApi.verifyTransaction(reference);
+
+        if (verification.status !== 'success' || (verification.data as any)?.status !== 'success') {
+          setStatus('failed');
+          setMessage('Payment verification failed. Please contact support.');
+          return;
+        }
+
+        // Find the pending transaction record we created during initiation
+        const { data: paymentRecord, error: paymentError } = await supabase
+          .from('payment_transactions')
+          .select('*')
+        .eq('transaction_id', reference)
+          .maybeSingle();
+
+        if (paymentError || !paymentRecord) {
+          console.error('Payment record not found:', paymentError);
+          setStatus('failed');
+          setMessage('We could not find your payment record. Please contact support.');
+          return;
+        }
+
+        const metadata = (paymentRecord.metadata as Record<string, any>) || {};
+        const purpose = metadata.purpose || 'general';
+        const userId = paymentRecord.user_id;
+
+        // Mark the transaction as verified (requires UPDATE RLS policy to succeed)
+        await supabase
+          .from('payment_transactions')
+          .update({ status: 'success', updated_at: new Date().toISOString() })
+          .eq('id', paymentRecord.id);
+
+        // Fulfill only when the money has actually been received
+        const fulfillment = await fulfillPayment(userId, paymentRecord, purpose, metadata);
+
+        if (fulfillment.success) {
+          setStatus('success');
+          setMessage(fulfillment.message || 'Payment completed successfully!');
+
+          toast({
+            title: 'Payment Successful! 🎉',
+            description: fulfillment.message,
+          });
         } else {
           setStatus('failed');
-          setMessage('Payment status unknown. Please contact support.');
+          setMessage(fulfillment.message || 'Payment could not be fulfilled. Please contact support.');
         }
       } catch (error) {
         console.error('Payment callback error:', error);
         setStatus('failed');
         setMessage('An error occurred while processing your payment.');
       }
+    };
+
+    const fulfillPayment = async (
+      userId: string,
+      paymentRecord: any,
+      purpose: string,
+      metadata: Record<string, any>
+    ): Promise<{ success: boolean; message?: string }> => {
+      if (purpose === 'coin_purchase') {
+        const coins = Number(metadata.coins || 0);
+        const bonus = Number(metadata.bonus || 0);
+        const totalCoins = coins + bonus;
+
+        if (totalCoins <= 0) {
+          return { success: false, message: 'Invalid coin amount for this purchase.' };
+        }
+
+        // Idempotency: only credit if no coin transaction is already linked to this payment
+        const { data: existing } = await supabase
+          .from('coin_transactions')
+          .select('id')
+          .eq('reference_id', paymentRecord.id)
+          .maybeSingle();
+
+        if (existing) {
+          return { success: true, message: 'Your coins have already been credited.' };
+        }
+
+        // Credit the user
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('coins_balance')
+          .eq('id', userId)
+          .single();
+
+        const newBalance = (profile?.coins_balance || 0) + totalCoins;
+
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ coins_balance: newBalance })
+          .eq('id', userId);
+
+        if (updateError) {
+          console.error('Failed to update coin balance:', updateError);
+          return { success: false, message: 'Could not credit your coins. Please contact support.' };
+        }
+
+        const { error: coinTxError } = await supabase.from('coin_transactions').insert({
+          user_id: userId,
+          amount: totalCoins,
+          transaction_type: 'purchase',
+          description: `Coin purchase via Paystack (${paymentRecord.currency} ${paymentRecord.amount})`,
+          reference_id: paymentRecord.id
+        });
+
+        if (coinTxError) {
+          console.error('Failed to log coin transaction:', coinTxError);
+        }
+
+        return { success: true, message: `Your wallet has been credited with ${totalCoins.toLocaleString()} LX coins!` };
+      }
+
+      if (purpose === 'vip_subscription') {
+        const planId = metadata.planId as string;
+        const tier = metadata.tier as string;
+        const durationDays = Number(metadata.durationDays || 30);
+
+        if (!tier) {
+          return { success: false, message: 'Missing VIP tier information.' };
+        }
+
+        // Idempotency: avoid creating a duplicate subscription for the same payment
+        const { data: existing } = await supabase
+          .from('subscriptions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('tier', tier)
+          .eq('amount', paymentRecord.amount)
+          .gt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+          .maybeSingle();
+
+        if (existing) {
+          return { success: true, message: 'Your VIP subscription is already active.' };
+        }
+
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + durationDays);
+
+        const { error: subError } = await supabase.from('subscriptions').insert({
+          user_id: userId,
+          tier,
+          status: 'active',
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          amount: paymentRecord.amount,
+          currency: paymentRecord.currency,
+          payment_method: 'paystack'
+        });
+
+        if (subError) {
+          console.error('Failed to create subscription:', subError);
+          return { success: false, message: 'Could not activate your VIP subscription. Please contact support.' };
+        }
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ is_premium: true, vip_tier: tier })
+          .eq('id', userId);
+
+        if (profileError) {
+          console.error('Failed to update profile VIP status:', profileError);
+        }
+
+        return { success: true, message: `Welcome to ${tier} VIP! Your subscription is now active.` };
+      }
+
+      // Fallback for unsupported or future purposes
+      return { success: true, message: 'Payment verified successfully.' };
     };
 
     handlePaymentCallback();
@@ -81,10 +233,10 @@ const PaymentCallback = () => {
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, duration: 0.3 }}
                 className={`w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center ${
-                  status === 'success' 
-                    ? 'bg-green-100' 
-                    : status === 'failed' 
-                    ? 'bg-red-100' 
+                  status === 'success'
+                    ? 'bg-green-100'
+                    : status === 'failed'
+                    ? 'bg-red-100'
                     : 'bg-blue-100'
                 }`}
               >
@@ -110,7 +262,7 @@ const PaymentCallback = () => {
                   {status === 'success' && 'Payment Successful!'}
                   {status === 'failed' && 'Payment Failed'}
                 </h1>
-                
+
                 <p className="text-gray-600 mb-6">
                   {status === 'loading' && 'Please wait while we verify your payment...'}
                   {status === 'success' && message}
@@ -134,7 +286,7 @@ const PaymentCallback = () => {
                     Back to Wallet
                   </Button>
                 )}
-                
+
                 {status === 'failed' && (
                   <Button
                     onClick={() => navigate('/wallet')}

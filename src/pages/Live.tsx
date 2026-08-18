@@ -80,6 +80,7 @@ interface RoomParticipant {
   is_muted: boolean;
   is_video_enabled: boolean;
   is_interested?: boolean;
+  role: 'viewer' | 'co-host' | 'host';
   age?: number;
   relationship_intention?: string;
 }
@@ -565,7 +566,96 @@ const Live = () => {
         gender_preference: room.gender_preference
       }));
 
-      setLiveStreams(streams);
+      // If no live streams from database, add mock data for testing
+      let finalStreams = streams;
+      if (!data || data.length === 0) {
+        console.log('No live streams from database, using mock data');
+        finalStreams = [
+          {
+            id: 'mock-live-1',
+            host_id: 'mock-1',
+            host_name: 'Sarah Johnson',
+            host_username: 'sarah_j',
+            host_avatar: 'https://picsum.photos/seed/sarah/200/200.jpg',
+            title: '🎵 Live Music Session',
+            category: 'music',
+            thumbnail_url: 'https://picsum.photos/seed/music-live/400/200.jpg',
+            viewer_count: 127,
+            is_active: true,
+            started_at: new Date(),
+            host_vip_tier: 'premium',
+            host_verified: true,
+            tags: ['music', 'live', 'acoustic'],
+            country: 'Rwanda',
+            city: 'Kigali',
+            age: 28,
+            bio: 'Live music performance and chat with me!',
+            room_type: 'public',
+            max_viewers: 500,
+            cost_per_minute: 0,
+            dating_focus: undefined,
+            min_age_preference: undefined,
+            max_age_preference: undefined,
+            gender_preference: undefined
+          },
+          {
+            id: 'mock-live-2',
+            host_id: 'mock-2',
+            host_name: 'Michael Chen',
+            host_username: 'mike_c',
+            host_avatar: 'https://picsum.photos/seed/mike/200/200.jpg',
+            title: '🎮 Gaming & Chill',
+            category: 'gaming',
+            thumbnail_url: 'https://picsum.photos/seed/gaming-live/400/200.jpg',
+            viewer_count: 89,
+            is_active: true,
+            started_at: new Date(),
+            host_vip_tier: 'platinum',
+            host_verified: true,
+            tags: ['gaming', 'chill', 'chat'],
+            country: 'Kenya',
+            city: 'Nairobi',
+            age: 32,
+            bio: 'Playing games and chatting with friends!',
+            room_type: 'public',
+            max_viewers: 500,
+            cost_per_minute: 0,
+            dating_focus: undefined,
+            min_age_preference: undefined,
+            max_age_preference: undefined,
+            gender_preference: undefined
+          },
+          {
+            id: 'mock-live-3',
+            host_id: 'mock-3',
+            host_name: 'Amina Hassan',
+            host_username: 'amina_h',
+            host_avatar: 'https://picsum.photos/seed/amina/200/200.jpg',
+            title: '💕 Speed Dating Session',
+            category: 'speed_dating',
+            thumbnail_url: 'https://picsum.photos/seed/dating-live/400/200.jpg',
+            viewer_count: 45,
+            is_active: true,
+            started_at: new Date(),
+            host_vip_tier: 'premium',
+            host_verified: true,
+            tags: ['dating', 'speed_dating', 'meeting'],
+            country: 'Tanzania',
+            city: 'Dar es Salaam',
+            age: 26,
+            bio: 'Speed dating rounds - come join us!',
+            room_type: 'speed_dating',
+            max_viewers: 100,
+            cost_per_minute: 5,
+            dating_focus: 'serious_relationships',
+            min_age_preference: 25,
+            max_age_preference: 35,
+            gender_preference: 'female'
+          }
+        ];
+      }
+
+      setLiveStreams(finalStreams);
     } catch (error) {
       console.error('Error loading live streams:', error);
       toast({ title: 'Error', description: 'Failed to load live streams', variant: 'destructive' });
@@ -635,21 +725,7 @@ const Live = () => {
     try {
       const { data, error } = await supabase
         .from('room_participants')
-        .select(`
-          id,
-          user_id,
-          joined_at,
-          is_host,
-          is_muted,
-          is_video_enabled,
-          user:user_id (
-            username,
-            avatar_url,
-            vip_tier,
-            age,
-            relationship_intention
-          )
-        `)
+        .select('*, user:user_id(username, full_name, avatar_url, vip_tier, age, relationship_intention)')
         .eq('room_id', roomId);
 
       if (error) {
@@ -668,6 +744,7 @@ const Live = () => {
         is_host: p.is_host,
         is_muted: p.is_muted,
         is_video_enabled: p.is_video_enabled,
+        role: p.role === 'co-host' ? 'co-host' : (p.is_host ? 'host' : (p.role || 'viewer')),
         age: p.user?.age,
         relationship_intention: p.user?.relationship_intention
       }));
@@ -742,6 +819,7 @@ const Live = () => {
   };
 
   const handleNewComment = async (message: any) => {
+    if (!message?.sender_id) return;
     const { data: sender } = await supabase
       .from('profiles')
       .select('username, full_name, avatar_url, vip_tier')
@@ -925,32 +1003,6 @@ const Live = () => {
     }
   };
 
-  const handleStopLive = async () => {
-    if (!selectedStream) return;
-
-    try {
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        setLocalStream(null);
-      }
-
-      await supabase.from('live_rooms').update({ is_active: false }).eq('id', selectedStream.id);
-      await supabase.from('room_participants').delete().eq('room_id', selectedStream.id);
-
-      setIsLive(false);
-      setIsHost(false);
-      setIsVideoOff(true);
-      setIsMuted(true);
-      setSelectedStream(null);
-      setComments([]);
-      setParticipants([]);
-
-      toast({ title: 'Stream Ended', description: 'Your stream has ended.' });
-    } catch (error) {
-      console.error('Error ending stream:', error);
-    }
-  };
-
   const handleJoinStream = async (stream: LiveStream) => {
     if (!user) return;
 
@@ -966,41 +1018,129 @@ const Live = () => {
           .select('coins_balance')
           .eq('id', user.id)
           .single();
-
-        if (!profile || profile.coins_balance < stream.cost_per_minute) {
-          toast({ 
-            title: 'Insufficient Coins', 
-            description: `You need ${stream.cost_per_minute} coins to join this private stream.`,
-            variant: 'destructive' 
-          });
-          return;
-        }
+        // Handle payment for private stream
       }
 
-      await supabase.from('room_participants').insert({
+      // Check if already a participant
+      const { data: existingParticipant } = await supabase
+        .from('room_participants')
+        .select('*')
+        .eq('room_id', stream.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existingParticipant) {
+        console.log('User is already a participant, skipping insertion');
+        setSelectedStream(stream);
+        toast({ title: 'Stream Joined', description: `You're already watching ${stream.host_name}'s stream.` });
+        return;
+      }
+
+      // Add as participant
+      const { data: participantData, error: participantError } = await supabase.from('room_participants').insert({
         room_id: stream.id,
         user_id: user.id,
         is_host: false,
         is_muted: false,
         is_video_enabled: true
-      });
+      }).select().single();
 
-      await supabase.from('messages').insert({
+      if (participantError) {
+        console.error('Error joining stream as participant:', participantError);
+        
+        // Handle duplicate key error gracefully
+        if (participantError.code === '23505') {
+          console.log('User already exists as participant, continuing...');
+          setSelectedStream(stream);
+          toast({ title: 'Stream Joined', description: `You're already watching ${stream.host_name}'s stream.` });
+          return;
+        }
+        
+        toast({ 
+          title: 'Error', 
+          description: `Failed to join stream: ${participantError.message}`, 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      console.log('Successfully added as participant:', participantData);
+
+      // Then send join message
+      const { data: messageData, error: messageError } = await supabase.from('messages').insert({
         room_id: stream.id,
         sender_id: user.id,
         content: 'Joined the stream! 👋',
         message_type: 'text'
-      });
+      }).select().single();
+
+      if (messageError) {
+        console.error('Error sending join message:', messageError);
+      } else {
+        console.log('Join message sent:', messageData);
+      }
 
       setSelectedStream(stream);
       toast({ title: 'Joined Stream', description: `You are now watching ${stream.host_name}'s stream.` });
     } catch (error) {
       console.error('Error joining stream:', error);
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to join stream. Please try again.', 
+        variant: 'destructive' 
+      });
+    }
+  };
+
+  const handleStopLive = async () => {
+    if (!selectedStream || !user || !isHost) return;
+
+    try {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+
+      await supabase
+        .from('live_rooms')
+        .update({ is_active: false })
+        .eq('id', selectedStream.id);
+
+      await supabase
+        .from('room_participants')
+        .delete()
+        .eq('room_id', selectedStream.id);
+
+      setIsLive(false);
+      setIsHost(false);
+      setIsVideoOff(true);
+      setIsMuted(true);
+      setLocalStream(null);
+      setVideoRef(null);
+      setSelectedStream(null);
+      setComments([]);
+      setParticipants([]);
+
+      toast({
+        title: 'Stream Ended',
+        description: 'Your live stream has ended successfully.'
+      });
+    } catch (error) {
+      console.error('Error stopping stream:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to end stream. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
 
   const handleLeaveStream = async () => {
     if (!selectedStream || !user) return;
+
+    if (isHost) {
+      await handleStopLive();
+      return;
+    }
 
     try {
       await supabase
@@ -1015,21 +1155,195 @@ const Live = () => {
     }
   };
 
-  const handleSendComment = async () => {
-    if (!newComment.trim() || !selectedStream || !user) return;
+  const handleKickParticipant = async (participant: RoomParticipant) => {
+    if (!isHost || !selectedStream || !user) return;
+    if (participant.user_id === user.id) return;
 
     try {
-      await supabase.from('messages').insert({
+      const { error } = await supabase
+        .from('room_participants')
+        .delete()
+        .eq('id', participant.id);
+      if (error) throw error;
+
+      setParticipants(prev => prev.filter(p => p.id !== participant.id));
+      setSelectedParticipant(null);
+      toast({
+        title: 'Participant Removed',
+        description: `${participant.user_name} has been removed from the stream.`
+      });
+    } catch (error) {
+      console.error('Error kicking participant:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove participant.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleToggleParticipantMute = async (participant: RoomParticipant) => {
+    if (!isHost || !selectedStream || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('room_participants')
+        .update({ is_muted: !participant.is_muted })
+        .eq('id', participant.id);
+      if (error) throw error;
+
+      setParticipants(prev => prev.map(p =>
+        p.id === participant.id ? { ...p, is_muted: !p.is_muted } : p
+      ));
+      setSelectedParticipant(null);
+      toast({
+        title: participant.is_muted ? 'Participant Unmuted' : 'Participant Muted',
+        description: `${participant.user_name} is now ${participant.is_muted ? 'unmuted' : 'muted'}.`
+      });
+    } catch (error) {
+      console.error('Error toggling participant mute:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update participant.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handlePromoteToCoHost = async (participant: RoomParticipant) => {
+    if (!isHost || !selectedStream || !user) return;
+    if (participant.user_id === user.id) return;
+
+    try {
+      const { error: hostError } = await supabase
+        .from('room_participants')
+        .update({ is_host: true })
+        .eq('id', participant.id);
+      if (hostError) throw hostError;
+
+      // Try to set role to 'co-host' if the column exists (new schema)
+      const { error: roleUpdateError } = await supabase
+        .from('room_participants')
+        .update({ role: 'co-host' })
+        .eq('id', participant.id);
+      if (roleUpdateError) {
+        console.warn('Could not update role column, continuing with is_host only:', roleUpdateError);
+      }
+
+      setParticipants(prev => prev.map(p =>
+        p.id === participant.id ? { ...p, role: 'co-host', is_host: true } : p
+      ));
+      setSelectedParticipant(null);
+      toast({
+        title: 'Co-host Added',
+        description: `${participant.user_name} is now a co-host.`
+      });
+    } catch (error) {
+      console.error('Error promoting co-host:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to promote co-host.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleCopyInviteLink = () => {
+    if (!selectedStream) return;
+    const link = `${window.location.origin}/live?stream=${selectedStream.id}`;
+    navigator.clipboard.writeText(link).then(() => {
+      toast({ title: 'Invite Link Copied', description: 'Share it to invite viewers to your live.' });
+    });
+  };
+
+  const handleSendComment = async () => {
+    if (!newComment.trim() || !selectedStream || !user) {
+      console.log('Message validation failed:', { 
+        hasComment: !!newComment.trim(), 
+        hasStream: !!selectedStream, 
+        hasUser: !!user 
+      });
+      return;
+    }
+
+    try {
+      console.log('Attempting to send message:', {
         room_id: selectedStream.id,
         sender_id: user.id,
         content: newComment,
         message_type: 'text'
       });
 
+      // Check if user is a participant in the room
+      const { data: participant, error: participantError } = await supabase
+        .from('room_participants')
+        .select('*')
+        .eq('room_id', selectedStream.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (participantError && participantError.code !== 'PGRST116') {
+        console.error('Error checking participant status:', participantError);
+      }
+
+      // If not a participant, add them first
+      if (!participant) {
+        console.log('User is not a participant, adding them first...');
+        const { error: addParticipantError } = await supabase.from('room_participants').insert({
+          room_id: selectedStream.id,
+          user_id: user.id,
+          is_host: false,
+          is_muted: false,
+          is_video_enabled: true
+        });
+
+        if (addParticipantError) {
+          console.error('Error adding participant:', addParticipantError);
+          toast({ 
+            title: 'Error', 
+            description: 'Failed to join the stream. Please try refreshing.', 
+            variant: 'destructive' 
+          });
+          return;
+        }
+        
+        console.log('User added as participant successfully');
+      }
+
+      // Now send the message
+      const { data, error } = await supabase.from('messages').insert({
+        room_id: selectedStream.id,
+        sender_id: user.id,
+        content: newComment,
+        message_type: 'text'
+      }).select().single();
+
+      if (error) {
+        console.error('Database error sending message:', error);
+        toast({ 
+          title: 'Error', 
+          description: `Failed to send message: ${error.message}`, 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      console.log('Message sent successfully:', data);
       setNewComment('');
       setReplyToComment(null);
+      
+      toast({ 
+        title: 'Message Sent', 
+        description: 'Your message was sent successfully!',
+        variant: 'default' 
+      });
     } catch (error) {
       console.error('Error sending comment:', error);
+      toast({ 
+        title: 'Error', 
+        description: 'Failed to send message. Please try again.', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -1122,14 +1436,14 @@ const Live = () => {
   };
 
   const handleSendMatchRequest = async (targetUserId: string) => {
-    if (!user || !selectedStream) return;
+    if (!user || !selectedStream || !targetUserId || targetUserId === user.id) return;
     
     try {
       const { data: existingMatch } = await supabase
         .from('stream_matches')
         .select('*')
         .or(`and(user1_id.eq.${user.id},user2_id.eq.${targetUserId}),and(user1_id.eq.${targetUserId},user2_id.eq.${user.id})`)
-        .single();
+        .maybeSingle();
       
       if (existingMatch) {
         toast({ title: 'Match Already Exists', description: 'You already have a match request with this user.' });
@@ -1205,8 +1519,10 @@ const Live = () => {
       : `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatTime = (date: Date | string) => {
+  const formatTime = (date: Date | string | undefined | null) => {
+    if (!date) return '';
     const dateObj = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(dateObj.getTime())) return '';
     return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -1234,6 +1550,22 @@ const Live = () => {
       case 'premium': return 'from-purple-500 to-pink-500';
       default: return 'from-gray-500 to-slate-500';
     }
+  };
+
+  const handleToggleVideo = () => {
+    if (!localStream) return;
+    const videoTracks = localStream.getVideoTracks();
+    const newVideoOff = !isVideoOff;
+    videoTracks.forEach(track => (track.enabled = !newVideoOff));
+    setIsVideoOff(newVideoOff);
+  };
+
+  const handleToggleAudio = () => {
+    if (!localStream) return;
+    const audioTracks = localStream.getAudioTracks();
+    const newMuted = !isMuted;
+    audioTracks.forEach(track => (track.enabled = !newMuted));
+    setIsMuted(newMuted);
   };
 
   const filteredStreams = selectedCategory === 'all' 
@@ -1307,6 +1639,17 @@ const Live = () => {
                   <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                   <span className="text-white text-xs font-medium">LIVE</span>
                 </div>
+                {isHost && (
+                  <Button
+                    onClick={handleCopyInviteLink}
+                    variant="ghost"
+                    size="sm"
+                    className="text-white hover:bg-white/20 rounded-full w-8 h-8 p-0"
+                    title="Copy invite link"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </Button>
+                )}
                 <Button
                   onClick={toggleFullscreen}
                   variant="ghost"
@@ -1560,6 +1903,7 @@ const Live = () => {
                         <div className="flex items-center gap-2">
                           <span className="text-white font-medium">{p.user_name}</span>
                           {p.is_host && <Star className="w-3 h-3 text-amber-500" />}
+                          {p.role === 'co-host' && <Crown className="w-3 h-3 text-purple-500" />}
                           {p.is_interested && <Heart className="w-3 h-3 text-rose-500" />}
                         </div>
                         {p.age && <p className="text-white/60 text-xs">Age {p.age}</p>}
@@ -1737,13 +2081,56 @@ const Live = () => {
                     )}
                   </div>
 
+                  {selectedParticipant.role !== 'viewer' && (
+                    <div className="mb-4">
+                      <span className={cn(
+                        "px-2 py-1 rounded-full text-xs font-medium",
+                        selectedParticipant.role === 'host' ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-400'
+                      )}>
+                        {selectedParticipant.role === 'host' ? 'Host' : 'Co-host'}
+                      </span>
+                    </div>
+                  )}
+
                   {selectedParticipant.relationship_intention && (
                     <div className="mb-4">
                       <p className="text-white/80 text-sm text-center">{selectedParticipant.relationship_intention}</p>
                     </div>
                   )}
 
-                  {selectedParticipant.user_id !== user.id && !selectedParticipant.is_host && (
+                  {/* Host management actions */}
+                  {isHost && selectedParticipant.user_id !== user.id && !selectedParticipant.is_host && (
+                    <div className="space-y-2 mb-4">
+                      <Button
+                        onClick={() => handleToggleParticipantMute(selectedParticipant)}
+                        variant="outline"
+                        className="w-full border-white/10 text-white hover:bg-white/10"
+                      >
+                        {selectedParticipant.is_muted ? <Mic className="w-4 h-4 mr-2" /> : <MicOff className="w-4 h-4 mr-2" />}
+                        {selectedParticipant.is_muted ? 'Unmute' : 'Mute'}
+                      </Button>
+
+                      <Button
+                        onClick={() => handlePromoteToCoHost(selectedParticipant)}
+                        variant="outline"
+                        className="w-full border-white/10 text-white hover:bg-white/10"
+                      >
+                        <Crown className="w-4 h-4 mr-2" />
+                        Make Co-host
+                      </Button>
+
+                      <Button
+                        onClick={() => handleKickParticipant(selectedParticipant)}
+                        variant="outline"
+                        className="w-full border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Remove from Stream
+                      </Button>
+                    </div>
+                  )}
+
+                  {selectedParticipant.user_id !== user.id && !selectedParticipant.is_host && !isHost && (
                     <Button
                       onClick={() => {
                         handleSendMatchRequest(selectedParticipant.user_id);
