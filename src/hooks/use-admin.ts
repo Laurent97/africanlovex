@@ -9,6 +9,11 @@ import {
   getRoomParticipants,
   getRoomReports,
   getMessages,
+  getPaymentTransactions,
+  getWithdrawalRequests,
+  getGifts,
+  getGiftTransactions,
+  getGiftExchangeRates,
   type AdminStats,
   type AdminUser,
   type GetUsersParams,
@@ -21,6 +26,15 @@ import {
   type RoomReport,
   type AdminMessage,
   type GetMessagesParams,
+  type AdminPaymentTransaction,
+  type GetPaymentTransactionsParams,
+  type AdminWithdrawalRequest,
+  type GetWithdrawalRequestsParams,
+  type AdminGift,
+  type GetGiftsParams,
+  type AdminGiftTransaction,
+  type GetGiftTransactionsParams,
+  type AdminGiftExchangeRate,
 } from '@/lib/admin';
 
 export function useAdminStats() {
@@ -297,4 +311,157 @@ export function useMessages(params: GetMessagesParams) {
   }, [fetch]);
 
   return { messages, count, loading, error, refetch: fetch };
+}
+
+export function usePaymentTransactions(params: GetPaymentTransactionsParams) {
+  const [transactions, setTransactions] = useState<AdminPaymentTransaction[]>([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { status, page, perPage } = params;
+
+  const fetch = useMemo(
+    () => async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getPaymentTransactions({ status, page, perPage });
+        setTransactions(result.data);
+        setCount(result.count);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load payment transactions');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [status, page, perPage]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { transactions, count, loading, error, refetch: fetch };
+}
+
+export function useWithdrawalRequests(params: GetWithdrawalRequestsParams) {
+  const [withdrawals, setWithdrawals] = useState<AdminWithdrawalRequest[]>([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { status, page, perPage } = params;
+
+  const fetch = useMemo(
+    () => async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getWithdrawalRequests({ status, page, perPage });
+        setWithdrawals(result.data);
+        setCount(result.count);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load withdrawal requests');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [status, page, perPage]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { withdrawals, count, loading, error, refetch: fetch };
+}
+
+export function useGifts(params: GetGiftsParams) {
+  const [gifts, setGifts] = useState<AdminGift[]>([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { page, perPage } = params;
+
+  const fetch = useMemo(
+    () => async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getGifts({ page, perPage });
+        setGifts(result.data);
+        setCount(result.count);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load gifts');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, perPage]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { gifts, count, loading, error, refetch: fetch };
+}
+
+export function useGiftTransactions(params: GetGiftTransactionsParams) {
+  const [transactions, setTransactions] = useState<AdminGiftTransaction[]>([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { page, perPage } = params;
+
+  const fetch = useMemo(
+    () => async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getGiftTransactions({ page, perPage });
+        setTransactions(result.data);
+        setCount(result.count);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load gift transactions');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, perPage]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { transactions, count, loading, error, refetch: fetch };
+}
+
+export function useGiftExchangeRates() {
+  const [rates, setRates] = useState<AdminGiftExchangeRate[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getGiftExchangeRates();
+      setRates(data);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load gift exchange rates');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetch();
+  }, []);
+
+  return { rates, loading, error, refetch: fetch };
 }

@@ -501,3 +501,284 @@ export async function deleteMessage(id: string): Promise<void> {
   if (error) throw error;
   await logAdminAction('Delete message', 'message', id, {});
 }
+
+export interface AdminPaymentTransaction {
+  id: string;
+  user_id: string;
+  transaction_id?: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  payment_method?: string | null;
+  provider?: string | null;
+  metadata?: Record<string, any> | null;
+  created_at: string;
+  updated_at?: string | null;
+  user?: { username?: string | null; full_name?: string | null } | null;
+}
+
+export interface GetPaymentTransactionsParams {
+  status?: 'all' | 'pending' | 'completed' | 'failed' | 'refunded';
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetPaymentTransactionsResult {
+  data: AdminPaymentTransaction[];
+  count: number;
+}
+
+export async function getPaymentTransactions(
+  params: GetPaymentTransactionsParams = {}
+): Promise<GetPaymentTransactionsResult> {
+  const { status = 'all', page = 1, perPage = 10 } = params;
+
+  let query = (supabase as any)
+    .from('payment_transactions')
+    .select(
+      `*,
+      user:profiles!payment_transactions_user_id_fkey(username, full_name)`,
+      { count: 'exact' }
+    )
+    .order('created_at', { ascending: false });
+
+  if (status !== 'all') {
+    query = query.eq('status', status);
+  }
+
+  const start = (page - 1) * perPage;
+  const { data, error, count } = await query.range(start, start + perPage - 1);
+
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as AdminPaymentTransaction[],
+    count: count ?? 0,
+  };
+}
+
+export interface AdminWithdrawalRequest {
+  id: string;
+  user_id: string;
+  amount: number;
+  currency: string;
+  status: 'pending' | 'approved' | 'rejected';
+  bank_code?: string | null;
+  account_number?: string | null;
+  account_name?: string | null;
+  created_at: string;
+  processed_at?: string | null;
+  user?: { username?: string | null; full_name?: string | null } | null;
+}
+
+export interface GetWithdrawalRequestsParams {
+  status?: 'all' | 'pending' | 'approved' | 'rejected';
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetWithdrawalRequestsResult {
+  data: AdminWithdrawalRequest[];
+  count: number;
+}
+
+export async function getWithdrawalRequests(
+  params: GetWithdrawalRequestsParams = {}
+): Promise<GetWithdrawalRequestsResult> {
+  const { status = 'all', page = 1, perPage = 10 } = params;
+
+  let query = (supabase as any)
+    .from('withdrawal_requests')
+    .select(
+      `*,
+      user:profiles!withdrawal_requests_user_id_fkey(username, full_name)`,
+      { count: 'exact' }
+    )
+    .order('created_at', { ascending: false });
+
+  if (status !== 'all') {
+    query = query.eq('status', status);
+  }
+
+  const start = (page - 1) * perPage;
+  const { data, error, count } = await query.range(start, start + perPage - 1);
+
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as AdminWithdrawalRequest[],
+    count: count ?? 0,
+  };
+}
+
+export async function updateWithdrawalRequest(
+  id: string,
+  status: 'approved' | 'rejected',
+  notes?: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  const update: Record<string, any> = { status, updated_at: now };
+  if (status === 'approved' || status === 'rejected') {
+    update.processed_at = now;
+  }
+
+  const { error } = await (supabase as any)
+    .from('withdrawal_requests')
+    .update(update)
+    .eq('id', id);
+
+  if (error) throw error;
+
+  await logAdminAction('Update withdrawal request', 'withdrawal_request', id, { status, notes });
+}
+
+export interface AdminGift {
+  id: string;
+  name: string;
+  name_local?: string | null;
+  description?: string | null;
+  tier?: string | null;
+  cost_coins: number;
+  icon_url?: string | null;
+  animation_url?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface GetGiftsParams {
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetGiftsResult {
+  data: AdminGift[];
+  count: number;
+}
+
+export async function getGifts(params: GetGiftsParams = {}): Promise<GetGiftsResult> {
+  const { page = 1, perPage = 10 } = params;
+  const start = (page - 1) * perPage;
+
+  const { data, error, count } = await (supabase as any)
+    .from('gifts')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(start, start + perPage - 1);
+
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as AdminGift[],
+    count: count ?? 0,
+  };
+}
+
+export async function toggleGiftActive(id: string, isActive: boolean): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('gifts')
+    .update({ is_active: isActive })
+    .eq('id', id);
+
+  if (error) throw error;
+
+  await logAdminAction('Toggle gift active', 'gift', id, { is_active: isActive });
+}
+
+export async function updateGiftPrice(id: string, price: number): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('gifts')
+    .update({ cost_coins: price })
+    .eq('id', id);
+
+  if (error) throw error;
+
+  await logAdminAction('Update gift price', 'gift', id, { cost_coins: price });
+}
+
+export async function createGift(gift: {
+  name: string;
+  cost_coins: number;
+  tier: string;
+  icon_url: string;
+}): Promise<void> {
+  const { error } = await (supabase as any).from('gifts').insert({
+    name: gift.name,
+    cost_coins: gift.cost_coins,
+    tier: gift.tier,
+    icon_url: gift.icon_url,
+    is_active: true,
+  });
+
+  if (error) throw error;
+
+  await logAdminAction('Create gift', 'gift', undefined, gift);
+}
+
+export interface AdminGiftTransaction {
+  id: string;
+  gift_id: string;
+  from_user_id: string;
+  to_user_id: string;
+  room_id?: string | null;
+  message?: string | null;
+  created_at: string;
+  gift?: { name?: string | null; icon_url?: string | null } | null;
+  sender?: { username?: string | null; full_name?: string | null } | null;
+  receiver?: { username?: string | null; full_name?: string | null } | null;
+}
+
+export interface GetGiftTransactionsParams {
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetGiftTransactionsResult {
+  data: AdminGiftTransaction[];
+  count: number;
+}
+
+export async function getGiftTransactions(
+  params: GetGiftTransactionsParams = {}
+): Promise<GetGiftTransactionsResult> {
+  const { page = 1, perPage = 10 } = params;
+  const start = (page - 1) * perPage;
+
+  const { data, error, count } = await (supabase as any)
+    .from('sent_gifts')
+    .select(
+      `*,
+      gift:gifts!sent_gifts_gift_id_fkey(name, icon_url),
+      sender:profiles!sent_gifts_from_user_id_fkey(username, full_name),
+      receiver:profiles!sent_gifts_to_user_id_fkey(username, full_name)`,
+      { count: 'exact' }
+    )
+    .order('created_at', { ascending: false })
+    .range(start, start + perPage - 1);
+
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as AdminGiftTransaction[],
+    count: count ?? 0,
+  };
+}
+
+export interface AdminGiftExchangeRate {
+  id: string;
+  gift_rarity: string;
+  exchange_rate: number;
+  base_price: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getGiftExchangeRates(): Promise<AdminGiftExchangeRate[]> {
+  const { data, error } = await (supabase as any)
+    .from('gift_exchange_rates')
+    .select('*')
+    .order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as AdminGiftExchangeRate[];
+}

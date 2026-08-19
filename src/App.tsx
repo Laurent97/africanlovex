@@ -47,6 +47,8 @@ const AdminReportDetail = lazy(() => import('./pages/admin/reports/Detail'));
 const AdminVerification = lazy(() => import('./pages/admin/verification'));
 const AdminLive = lazy(() => import('./pages/admin/live'));
 const AdminContent = lazy(() => import('./pages/admin/content'));
+const AdminPayments = lazy(() => import('./pages/admin/payments'));
+const AdminGifts = lazy(() => import('./pages/admin/gifts'));
 const AdminPlaceholder = lazy(() => import('./components/admin/AdminPlaceholder'));
 
 // Loading component for lazy loading
@@ -382,8 +384,8 @@ const App = () => (
             <Route path="/admin/reports" element={<Suspense fallback={<LoadingSpinner />}><AdminReports /></Suspense>} />
             <Route path="/admin/reports/:id" element={<Suspense fallback={<LoadingSpinner />}><AdminReportDetail /></Suspense>} />
             <Route path="/admin/live" element={<Suspense fallback={<LoadingSpinner />}><AdminLive /></Suspense>} />
-            <Route path="/admin/gifts" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
-            <Route path="/admin/payments" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
+            <Route path="/admin/gifts" element={<Suspense fallback={<LoadingSpinner />}><AdminGifts /></Suspense>} />
+            <Route path="/admin/payments" element={<Suspense fallback={<LoadingSpinner />}><AdminPayments /></Suspense>} />
             <Route path="/admin/content" element={<Suspense fallback={<LoadingSpinner />}><AdminContent /></Suspense>} />
             <Route path="/admin/analytics" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
             <Route path="/admin/settings" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
