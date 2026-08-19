@@ -496,6 +496,7 @@ const Live = () => {
   const [selectedStream, setSelectedStream] = useState<LiveStream | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [isLive, setIsLive] = useState(false);
+  const [isPractice, setIsPractice] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [comments, setComments] = useState<LiveComment[]>([]);
@@ -587,7 +588,7 @@ const Live = () => {
       }
       
       // End live stream if still active (fire and forget for cleanup)
-      if (isLive && isHost && selectedStream) {
+      if (isLive && isHost && selectedStream && !isPractice) {
         supabase.from('live_rooms').update({ is_active: false }).eq('id', selectedStream.id);
         supabase.from('room_participants').delete().eq('room_id', selectedStream.id);
       }
@@ -604,7 +605,7 @@ const Live = () => {
   // Auto-end stream when user leaves or closes page (unless minimized)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isLive && isHost && selectedStream) {
+      if (isLive && isHost && selectedStream && !isPractice) {
         // End the stream before page unload
         handleStopLive();
         // Show confirmation dialog
@@ -615,7 +616,7 @@ const Live = () => {
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && isLive && isHost && selectedStream) {
+      if (document.visibilityState === 'hidden' && isLive && isHost && selectedStream && !isPractice) {
         // Page is hidden (minimized or tab switched)
         // Don't end stream on minimize, only on actual close/navigation away
         console.log('Page hidden, keeping stream alive for potential minimize');
@@ -623,7 +624,7 @@ const Live = () => {
     };
 
     const handlePageHide = (e: PageTransitionEvent) => {
-      if (isLive && isHost && selectedStream) {
+      if (isLive && isHost && selectedStream && !isPractice) {
         // User is navigating away or closing tab
         handleStopLive();
       }
@@ -641,7 +642,7 @@ const Live = () => {
       window.removeEventListener('pagehide', handlePageHide);
       
       // End stream if component unmounts while live
-      if (isLive && isHost && selectedStream) {
+      if (isLive && isHost && selectedStream && !isPractice) {
         handleStopLive();
       }
     };
@@ -649,6 +650,7 @@ const Live = () => {
 
   useEffect(() => {
     if (selectedStream) {
+      if (isPractice) return;
       loadStreamComments(selectedStream.id);
       loadRoomParticipants(selectedStream.id);
 
@@ -686,7 +688,7 @@ const Live = () => {
         if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
       };
     }
-  }, [selectedStream]);
+  }, [selectedStream, isPractice]);
 
   useEffect(() => {
     if (videoRef && localStream) {
@@ -1154,6 +1156,79 @@ const Live = () => {
     setComments(prev => [...prev, systemComment]);
   };
 
+  const handleStartPractice = async () => {
+    if (!user) return;
+
+    try {
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      } catch (mediaError) {
+        console.error('Media access error:', mediaError);
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          toast({ title: "Video-Only Preview", description: "Microphone access denied, practicing with video only." });
+          setIsMuted(true);
+        } catch {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+            toast({ title: "Audio-Only Preview", description: "Camera access denied, practicing with audio only." });
+            setIsVideoOff(true);
+          } catch {
+            toast({
+              title: "Camera/Microphone Permission Denied",
+              description: "Please allow camera and microphone access in your browser settings.",
+              variant: "destructive"
+            });
+            return;
+          }
+        }
+      }
+
+      setLocalStream(stream);
+
+      const videoTracks = stream.getVideoTracks();
+      const audioTracks = stream.getAudioTracks();
+      setIsVideoOff(videoTracks.length === 0);
+      setIsMuted(audioTracks.length === 0);
+
+      const practiceStream: LiveStream = {
+        id: 'practice',
+        host_id: user.id,
+        host_name: 'Practice',
+        host_username: 'practice',
+        host_avatar: `https://ui-avatars.com/api/?name=Practice&size=400&background=4F46E5&color=fff&format=png`,
+        title: 'Practice Mode',
+        category: 'practice',
+        thumbnail_url: `https://ui-avatars.com/api/?name=Practice&size=400&background=4F46E5&color=fff&format=png`,
+        viewer_count: 0,
+        is_active: true,
+        started_at: new Date(),
+        host_vip_tier: 'free',
+        host_verified: false,
+        tags: [],
+        room_type: 'public',
+        max_viewers: 0,
+        cost_per_minute: undefined,
+        dating_focus: undefined,
+        min_age_preference: undefined,
+        max_age_preference: undefined,
+        gender_preference: undefined
+      };
+
+      setIsHost(true);
+      setIsLive(true);
+      setIsPractice(true);
+      setSelectedStream(practiceStream);
+
+      toast({ title: 'Practice Mode Started', description: 'Preview your camera and mic. You are not live.' });
+    } catch (error) {
+      console.error('Error starting practice:', error);
+      toast({ title: 'Error', description: 'Failed to start practice mode.', variant: 'destructive' });
+    }
+  };
+
   const handleStartLive = async () => {
     if (!user) return;
 
@@ -1394,44 +1469,44 @@ const Live = () => {
 
   const handleStopLive = async () => {
     if (!selectedStream || !user || !isHost) return;
+    const wasPractice = isPractice;
 
-    try {
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-
-      await supabase
-        .from('live_rooms')
-        .update({ is_active: false })
-        .eq('id', selectedStream.id);
-
-      await supabase
-        .from('room_participants')
-        .delete()
-        .eq('room_id', selectedStream.id);
-
-      setIsLive(false);
-      setIsHost(false);
-      setIsVideoOff(true);
-      setIsMuted(true);
-      setLocalStream(null);
-      setVideoRef(null);
-      setSelectedStream(null);
-      setComments([]);
-      setParticipants([]);
-
-      toast({
-        title: 'Stream Ended',
-        description: 'Your live stream has ended successfully.'
-      });
-    } catch (error) {
-      console.error('Error stopping stream:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to end stream. Please try again.',
-        variant: 'destructive'
-      });
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
     }
+
+    if (!wasPractice) {
+      try {
+        await supabase
+          .from('live_rooms')
+          .update({ is_active: false })
+          .eq('id', selectedStream.id);
+
+        await supabase
+          .from('room_participants')
+          .delete()
+          .eq('room_id', selectedStream.id);
+      } catch (error) {
+        console.error('Error stopping stream:', error);
+      }
+    }
+
+    setIsLive(false);
+    setIsHost(false);
+    setIsPractice(false);
+    setIsVideoOff(true);
+    setIsMuted(true);
+    setLocalStream(null);
+    setVideoRef(null);
+    setSelectedStream(null);
+    setComments([]);
+    setParticipants([]);
+    setViewerCount(0);
+
+    toast({
+      title: wasPractice ? 'Practice Ended' : 'Stream Ended',
+      description: wasPractice ? 'You have left practice mode.' : 'Your live stream has ended successfully.'
+    });
   };
 
   const handleLeaveStream = async () => {
@@ -1456,7 +1531,7 @@ const Live = () => {
   };
 
   const handleKickParticipant = async (participant: RoomParticipant) => {
-    if (!isHost || !selectedStream || !user) return;
+    if (!isHost || !selectedStream || !user || isPractice) return;
     if (participant.user_id === user.id) return;
 
     try {
@@ -1483,7 +1558,7 @@ const Live = () => {
   };
 
   const handleToggleParticipantMute = async (participant: RoomParticipant) => {
-    if (!isHost || !selectedStream || !user) return;
+    if (!isHost || !selectedStream || !user || isPractice) return;
 
     try {
       const { error } = await supabase
@@ -1511,7 +1586,7 @@ const Live = () => {
   };
 
   const handlePromoteToCoHost = async (participant: RoomParticipant) => {
-    if (!isHost || !selectedStream || !user) return;
+    if (!isHost || !selectedStream || !user || isPractice) return;
     if (participant.user_id === user.id) return;
 
     try {
@@ -1561,7 +1636,7 @@ const Live = () => {
   const handleClearGuests = () => setGuests([]);
 
   const handleCopyInviteLink = () => {
-    if (!selectedStream) return;
+    if (!selectedStream || isPractice) return;
     const link = `${window.location.origin}/live?stream=${selectedStream.id}`;
     navigator.clipboard.writeText(link).then(() => {
       toast({ title: 'Invite Link Copied', description: 'Share it to invite viewers to your live.' });
@@ -1569,7 +1644,7 @@ const Live = () => {
   };
 
   const handleSendComment = async () => {
-    if (!newComment.trim() || !selectedStream || !user) {
+    if (!newComment.trim() || !selectedStream || !user || isPractice) {
       console.log('Message validation failed:', { 
         hasComment: !!newComment.trim(), 
         hasStream: !!selectedStream, 
@@ -1666,7 +1741,7 @@ const Live = () => {
   };
 
   const handleSendGift = async (gift: Gift) => {
-    if (!selectedStream || !user) return;
+    if (!selectedStream || !user || isPractice) return;
 
     try {
       const { data: profile } = await supabase
@@ -1725,7 +1800,7 @@ const Live = () => {
   };
 
   const handleDatingInterest = async () => {
-    if (!selectedStream || !user) return;
+    if (!selectedStream || !user || isPractice) return;
     
     await supabase.from('messages').insert({ 
       room_id: selectedStream.id, 
@@ -1782,7 +1857,7 @@ const Live = () => {
   };
 
   const handleLike = async () => {
-    if (!selectedStream || !user) return;
+    if (!selectedStream || !user || isPractice) return;
     try {
       const { data, error } = await supabase.from('messages').insert({
         room_id: selectedStream.id,
@@ -1807,7 +1882,7 @@ const Live = () => {
   };
 
   const handleStartPoll = async () => {
-    if (!selectedStream || !user || !isHost || !newPollQuestion.trim()) return;
+    if (!selectedStream || !user || !isHost || isPractice || !newPollQuestion.trim()) return;
     const validOptions = newPollOptions.map(o => o.trim()).filter(Boolean);
     if (validOptions.length < 2 || validOptions.length > 4) {
       toast({ title: 'Invalid Poll', description: 'A poll needs 2 to 4 options.', variant: 'destructive' });
@@ -1841,7 +1916,7 @@ const Live = () => {
   };
 
   const handleVote = async (optionIndex: number) => {
-    if (!selectedStream || !user || !activePoll) return;
+    if (!selectedStream || !user || !activePoll || isPractice) return;
 
     try {
       const { error } = await supabase.from('messages').insert({
@@ -1867,7 +1942,7 @@ const Live = () => {
   };
 
   const handleEndPoll = async () => {
-    if (!selectedStream || !user || !activePoll || !isHost) return;
+    if (!selectedStream || !user || !activePoll || !isHost || isPractice) return;
 
     try {
       const { error } = await supabase.from('messages').insert({
@@ -1901,6 +1976,7 @@ const Live = () => {
   };
 
   const handleShare = () => {
+    if (isPractice) return;
     const streamUrl = `${window.location.origin}/live?stream=${selectedStream?.id}`;
     if (navigator.share) {
       navigator.share({ 
@@ -2007,7 +2083,7 @@ const Live = () => {
         <div className="h-screen w-full bg-black relative overflow-hidden flex flex-col lg:flex-row">
           {/* Moderation Panel */}
           <AnimatePresence>
-            {showModeration && isHost && (
+            {showModeration && isHost && !isPractice && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -2056,7 +2132,7 @@ const Live = () => {
 
           {/* Multi-Guest Panel */}
           <AnimatePresence>
-            {showMultiGuest && isHost && (
+            {showMultiGuest && isHost && !isPractice && (
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -2232,10 +2308,17 @@ const Live = () => {
                   <Eye className="w-3.5 h-3.5 text-white" />
                   <span className="text-white text-xs font-semibold">{viewerCount.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-rose-600 shadow-lg shadow-rose-600/20">
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                  <span className="text-white text-xs font-bold tracking-wide">LIVE</span>
-                </div>
+                {isPractice ? (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-indigo-600 shadow-lg shadow-indigo-600/20">
+                    <span className="w-1.5 h-1.5 bg-white rounded-full" />
+                    <span className="text-white text-xs font-bold tracking-wide">Practice Mode</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-rose-600 shadow-lg shadow-rose-600/20">
+                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                    <span className="text-white text-xs font-bold tracking-wide">LIVE</span>
+                  </div>
+                )}
                 {isHost && (
                   <Button
                     onClick={handleCopyInviteLink}
@@ -2380,24 +2463,28 @@ const Live = () => {
                     >
                       <Users className="w-5 h-5" />
                     </Button>
-                    <Button
-                      onClick={() => setShowMultiGuest(true)}
-                      variant="ghost"
-                      size="sm"
-                      className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium"
-                    >
-                      <Users className="w-4 h-4 mr-1.5" />
-                      Multi-Guest
-                    </Button>
-                    <Button
-                      onClick={() => setShowPollCreator(true)}
-                      variant="ghost"
-                      size="sm"
-                      className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium"
-                    >
-                      <BarChart3 className="w-4 h-4 mr-1.5" />
-                      Poll
-                    </Button>
+                    {!isPractice && (
+                      <Button
+                        onClick={() => setShowMultiGuest(true)}
+                        variant="ghost"
+                        size="sm"
+                        className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium"
+                      >
+                        <Users className="w-4 h-4 mr-1.5" />
+                        Multi-Guest
+                      </Button>
+                    )}
+                    {!isPractice && (
+                      <Button
+                        onClick={() => setShowPollCreator(true)}
+                        variant="ghost"
+                        size="sm"
+                        className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium"
+                      >
+                        <BarChart3 className="w-4 h-4 mr-1.5" />
+                        Poll
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -2416,13 +2503,15 @@ const Live = () => {
                 <div className="flex items-center gap-2">
                   {isHost && (
                     <>
-                      <Button
-                        onClick={() => setShowModeration(!showModeration)}
-                        className="h-11 px-5 rounded-full bg-slate-700 hover:bg-slate-600 text-white font-semibold text-sm shadow-lg"
-                      >
-                        <Shield className="w-4 h-4 mr-1.5" />
-                        Moderation
-                      </Button>
+                      {!isPractice && (
+                        <Button
+                          onClick={() => setShowModeration(!showModeration)}
+                          className="h-11 px-5 rounded-full bg-slate-700 hover:bg-slate-600 text-white font-semibold text-sm shadow-lg"
+                        >
+                          <Shield className="w-4 h-4 mr-1.5" />
+                          Moderation
+                        </Button>
+                      )}
                       <Button
                         onClick={handleStopLive}
                         className="h-11 px-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-lg shadow-rose-600/30"
@@ -2456,7 +2545,7 @@ const Live = () => {
             </div>
           </div>
 
-          {isHost && (
+          {isHost && !isPractice && (
             <PollCreator
               show={showPollCreator}
               onClose={() => setShowPollCreator(false)}
@@ -2973,6 +3062,13 @@ const Live = () => {
                 >
                   <Video className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Go Live</span>
+                </Button>
+                <Button
+                  onClick={handleStartPractice}
+                  className="bg-slate-600 hover:bg-slate-700 text-white text-sm font-semibold h-10 px-4 rounded-full shadow-lg"
+                >
+                  <Camera className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Practice Mode</span>
                 </Button>
                 <Button
                   onClick={() => setShowMobileMenu(true)}
