@@ -101,11 +101,11 @@ interface Gift {
 
 const LiveThumbnail: React.FC<{ stream: LiveStream; className?: string }> = ({ stream, className }) => {
   return (
-    <div className="relative w-full h-full">
+    <div className={cn("relative w-full h-full overflow-hidden bg-slate-900", className)}>
       <img
         src={stream.thumbnail_url}
         alt={`${stream.host_name}'s live stream`}
-        className={cn("w-full h-full object-cover", className)}
+        className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
         loading="lazy"
         onError={(e) => {
           // Fallback to generated placeholder if thumbnail fails to load
@@ -113,14 +113,15 @@ const LiveThumbnail: React.FC<{ stream: LiveStream; className?: string }> = ({ s
         }}
       />
       {stream.is_active && (
-        <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-full bg-red-600 text-white text-xs font-medium shadow-lg">
-          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-600 text-white text-[10px] font-bold tracking-wide shadow-lg">
+          <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
           LIVE
         </div>
       )}
-      <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white text-xs font-medium">
+      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
+      <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-md text-white text-xs font-medium">
         <Users className="w-3 h-3" />
-        {stream.viewer_count}
+        {stream.viewer_count.toLocaleString()}
       </div>
     </div>
   );
@@ -226,22 +227,27 @@ const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () =>
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 50 }}
-      className="bg-gradient-to-b from-gray-900 to-gray-950 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden border border-white/10 w-full max-w-lg mx-auto"
+      exit={{ opacity: 0, y: 20 }}
+      className="bg-slate-950/95 backdrop-blur-xl rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden border border-white/10 w-full max-w-lg mx-auto"
     >
-      <div className="p-4 border-b border-white/10 flex items-center justify-between bg-gradient-to-r from-rose-600 to-purple-600 sticky top-0">
-        <h3 className="text-white font-semibold flex items-center gap-2">
-          <Gift className="w-5 h-5" />
-          Gift Shop
-        </h3>
-        <Button onClick={onClose} variant="ghost" size="sm" className="text-white hover:bg-white/20">
+      <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between sticky top-0 bg-slate-950/95 z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-purple-600 flex items-center justify-center shadow-lg">
+            <Gift className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h3 className="text-white font-semibold text-sm">Gift Shop</h3>
+            <p className="text-white/40 text-xs">Send love & support</p>
+          </div>
+        </div>
+        <Button onClick={onClose} variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 rounded-full h-9 w-9">
           <X className="w-5 h-5" />
         </Button>
       </div>
 
-      <div className="p-4 max-h-[70vh] overflow-y-auto">
+      <div className="p-4 sm:p-5 max-h-[70vh] overflow-y-auto">
         {/* Tier Filters */}
         <div className="flex gap-2 overflow-x-auto pb-4 mb-4 scrollbar-hide">
           {tiers.map((tier) => (
@@ -249,10 +255,10 @@ const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () =>
               key={tier.id}
               onClick={() => setSelectedTier(tier.id)}
               className={cn(
-                "flex items-center gap-1 px-4 py-2 rounded-full text-sm whitespace-nowrap transition-all",
+                "flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all border",
                 selectedTier === tier.id
-                  ? `bg-gradient-to-r ${getTierColor(tier.id)} text-white shadow-lg`
-                  : 'bg-white/10 text-white/70 hover:bg-white/20'
+                  ? `bg-gradient-to-r ${getTierColor(tier.id)} text-white border-transparent shadow-lg`
+                  : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10 hover:text-white'
               )}
             >
               <span>{tier.icon}</span>
@@ -271,24 +277,28 @@ const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () =>
             {filteredGifts.map((gift) => (
               <motion.button
                 key={gift.id}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => onSendGift(gift)}
-                className="bg-gradient-to-b from-white/10 to-white/5 rounded-xl p-3 hover:shadow-xl transition-all group"
+                className="relative bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 rounded-2xl p-3 transition-all group text-left"
               >
-                <div className="relative mb-2">
+                <div className="relative mb-3">
                   <div className={cn(
-                    "w-12 h-12 mx-auto rounded-full bg-gradient-to-br flex items-center justify-center text-2xl group-hover:scale-110 transition-transform",
+                    "w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br flex items-center justify-center text-3xl shadow-lg group-hover:scale-110 transition-transform",
                     getTierColor(gift.tier)
                   )}>
                     {gift.icon_url || '🎁'}
                   </div>
                   {gift.tier === 'legendary' && (
-                    <Sparkles className="absolute -top-1 -right-1 w-3 h-3 text-yellow-500 animate-pulse" />
+                    <Sparkles className="absolute -top-1 -right-2 w-4 h-4 text-yellow-400 animate-pulse" />
                   )}
                 </div>
-                <h4 className="text-white font-medium text-xs text-center mb-1 line-clamp-1">{gift.name}</h4>
-                <p className="text-rose-400 font-bold text-xs text-center">{gift.cost_coins} 💎</p>
+                <h4 className="text-white font-semibold text-xs text-center mb-0.5 line-clamp-1">{gift.name}</h4>
+                <p className="text-white/50 text-[10px] text-center mb-2 line-clamp-1">{gift.name_local}</p>
+                <div className="flex items-center justify-center gap-1 text-rose-400 font-bold text-xs bg-rose-500/10 rounded-full py-1.5">
+                  <Gem className="w-3 h-3" />
+                  {gift.cost_coins}
+                </div>
               </motion.button>
             ))}
           </div>
@@ -1578,11 +1588,11 @@ const Live = () => {
   if (selectedStream) {
     return (
       <AuthGuard>
-        <div className="h-screen bg-black relative overflow-hidden flex flex-col">
+        <div className="h-screen w-full bg-black relative overflow-hidden flex flex-col lg:flex-row">
           {/* Video Container */}
-          <div 
+          <div
             ref={videoContainerRef}
-            className="relative flex-1 bg-black"
+            className="relative w-full h-full lg:h-auto lg:flex-1 bg-black"
           >
             {/* Video Player */}
             <div className="absolute inset-0">
@@ -1607,44 +1617,51 @@ const Live = () => {
             <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent pointer-events-none" />
 
             {/* Top Bar */}
-            <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between z-10">
-              <div className="flex items-center gap-2">
+            <div className="absolute top-0 left-0 right-0 p-3 sm:p-4 flex items-center justify-between z-20 bg-gradient-to-b from-black/70 via-black/20 to-transparent">
+              <div className="flex items-center gap-3">
                 <Button
                   onClick={handleLeaveStream}
                   variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/20 rounded-full w-8 h-8 p-0"
+                  size="icon"
+                  className="text-white hover:bg-white/20 rounded-full w-9 h-9 p-0"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </Button>
 
-                <div className="flex items-center gap-2">
-                  <Avatar className="w-8 h-8 ring-2 ring-rose-500">
-                    <AvatarImage src={selectedStream.host_avatar} />
-                    <AvatarFallback className="text-xs">{selectedStream.host_name[0]}</AvatarFallback>
-                  </Avatar>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Avatar className="w-10 h-10 ring-2 ring-white/30">
+                      <AvatarImage src={selectedStream.host_avatar} />
+                      <AvatarFallback className="text-sm bg-gradient-to-br from-rose-500 to-purple-600 text-white">{selectedStream.host_name[0]}</AvatarFallback>
+                    </Avatar>
+                    {selectedStream.host_verified && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-black flex items-center justify-center">
+                        <Shield className="w-2.5 h-2.5 text-white" />
+                      </div>
+                    )}
+                  </div>
                   <div>
                     <h2 className="text-white text-sm font-semibold">{selectedStream.host_name}</h2>
-                    <p className="text-white/60 text-xs line-clamp-1 max-w-[120px]">{selectedStream.title}</p>
+                    <p className="text-white/70 text-xs line-clamp-1 max-w-[140px] sm:max-w-[240px]">{selectedStream.title}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm">
-                  <Eye className="w-3 h-3 text-white" />
-                  <span className="text-white text-xs">{viewerCount}</span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10">
+                  <Eye className="w-3.5 h-3.5 text-white" />
+                  <span className="text-white text-xs font-semibold">{viewerCount.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-rose-600">
-                  <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                  <span className="text-white text-xs font-medium">LIVE</span>
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-rose-600 shadow-lg shadow-rose-600/20">
+                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                  <span className="text-white text-xs font-bold tracking-wide">LIVE</span>
                 </div>
                 {isHost && (
                   <Button
                     onClick={handleCopyInviteLink}
                     variant="ghost"
-                    size="sm"
-                    className="text-white hover:bg-white/20 rounded-full w-8 h-8 p-0"
+                    size="icon"
+                    className="text-white hover:bg-white/20 rounded-full w-9 h-9 p-0"
                     title="Copy invite link"
                   >
                     <Share2 className="w-4 h-4" />
@@ -1653,8 +1670,8 @@ const Live = () => {
                 <Button
                   onClick={toggleFullscreen}
                   variant="ghost"
-                  size="sm"
-                  className="text-white hover:bg-white/20 rounded-full w-8 h-8 p-0"
+                  size="icon"
+                  className="text-white hover:bg-white/20 rounded-full w-9 h-9 p-0"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </Button>
@@ -1693,91 +1710,213 @@ const Live = () => {
               {participants.length}
             </Button>
 
+            {/* Right Side Action Buttons (TikTok Style) */}
+            <div className="absolute right-3 bottom-24 sm:bottom-28 flex flex-col items-center gap-4 z-20">
+              {!isHost && (
+                <>
+                  <button
+                    onClick={handleLike}
+                    className="flex flex-col items-center gap-1 group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-rose-500/90 backdrop-blur-md shadow-lg shadow-rose-500/30 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                      <Heart className="w-6 h-6 fill-current" />
+                    </div>
+                    <span className="text-white text-[10px] font-medium drop-shadow-md">Like</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowGiftMenu(true)}
+                    className="flex flex-col items-center gap-1 group"
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-rose-500 to-purple-600 shadow-xl shadow-rose-500/30 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                      <Gift className="w-7 h-7" />
+                    </div>
+                    <span className="text-white text-[10px] font-medium drop-shadow-md">Gift</span>
+                  </button>
+
+                  <button
+                    onClick={handleDatingInterest}
+                    className="flex flex-col items-center gap-1 group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 shadow-lg shadow-pink-500/30 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                      <Sparkles className="w-6 h-6" />
+                    </div>
+                    <span className="text-white text-[10px] font-medium drop-shadow-md">Match</span>
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={() => setIsChatVisible(!isChatVisible)}
+                className="flex flex-col items-center gap-1 group lg:hidden"
+              >
+                <div className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                  <MessageCircle className="w-6 h-6" />
+                </div>
+                <span className="text-white text-[10px] font-medium drop-shadow-md">Chat</span>
+              </button>
+
+              <button
+                onClick={handleShare}
+                className="flex flex-col items-center gap-1 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                  <Share2 className="w-6 h-6" />
+                </div>
+                <span className="text-white text-[10px] font-medium drop-shadow-md">Share</span>
+              </button>
+            </div>
+
             {/* Bottom Controls */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {isHost ? (
-                    <>
-                      <Button
-                        onClick={handleToggleVideo}
-                        variant="ghost"
-                        size="sm"
-                        className={`w-10 h-10 rounded-full ${
-                          isVideoOff ? 'bg-rose-600' : 'bg-white/20'
-                        } text-white`}
-                      >
-                        {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-                      </Button>
-                      <Button
-                        onClick={handleToggleAudio}
-                        variant="ghost"
-                        size="sm"
-                        className={`w-10 h-10 rounded-full ${
-                          isMuted ? 'bg-rose-600' : 'bg-white/20'
-                        } text-white`}
-                      >
-                        {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                      </Button>
-                    </>
-                  ) : (
+            <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+              <div className="flex items-center justify-between gap-3">
+                {isHost ? (
+                  <div className="flex items-center gap-2">
                     <Button
-                      onClick={handleDatingInterest}
+                      onClick={handleToggleVideo}
+                      variant="ghost"
+                      size="icon"
+                      className={cn("w-11 h-11 rounded-full text-white", isVideoOff ? 'bg-rose-600' : 'bg-white/15 border border-white/20')}
+                    >
+                      {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
+                    </Button>
+                    <Button
+                      onClick={handleToggleAudio}
+                      variant="ghost"
+                      size="icon"
+                      className={cn("w-11 h-11 rounded-full text-white", isMuted ? 'bg-rose-600' : 'bg-white/15 border border-white/20')}
+                    >
+                      {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </Button>
+                    <Button
+                      onClick={() => setShowParticipants(true)}
+                      variant="ghost"
+                      size="icon"
+                      className="w-11 h-11 rounded-full bg-white/15 border border-white/20 text-white"
+                    >
+                      <Users className="w-5 h-5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => setShowIcebreakers(true)}
                       variant="ghost"
                       size="sm"
-                      className="w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white"
+                      className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium"
                     >
-                      <Heart className="w-5 h-5" />
+                      <MessageCircle className="w-4 h-4 mr-1.5" />
+                      Icebreakers
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  {isHost && (
+                    <Button
+                      onClick={handleStopLive}
+                      className="h-11 px-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-lg shadow-rose-600/30"
+                    >
+                      End Stream
                     </Button>
                   )}
+                  {!isHost && (
+                    <>
+                      <Button
+                        onClick={() => setShowGiftMenu(true)}
+                        className="hidden sm:flex h-11 px-5 rounded-full bg-gradient-to-r from-rose-500 to-purple-600 text-white font-semibold text-sm shadow-lg shadow-rose-500/30"
+                      >
+                        <Gift className="w-4 h-4 mr-1.5" />
+                        Send Gift
+                      </Button>
+                      <Button
+                        onClick={() => setIsChatVisible(!isChatVisible)}
+                        variant="ghost"
+                        size="sm"
+                        className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium lg:hidden"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-1.5" />
+                        {comments.length} Chat
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
 
-                  <Button
-                    onClick={() => setShowGiftMenu(true)}
-                    variant="ghost"
-                    size="sm"
-                    className="w-10 h-10 rounded-full bg-white/20 text-white"
-                  >
-                    <Gift className="w-5 h-5" />
-                  </Button>
+          {/* Desktop Side Chat Panel */}
+          <div className="hidden lg:flex w-[380px] h-full bg-slate-950 border-l border-white/10 flex-col z-10">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between bg-slate-950">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-rose-500" />
+                <h3 className="text-white font-semibold text-sm">Live Chat</h3>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-white/60 text-xs">{viewerCount.toLocaleString()} watching</span>
+              </div>
+            </div>
 
-                  <Button
-                    onClick={handleLike}
-                    variant="ghost"
-                    size="sm"
-                    className="w-10 h-10 rounded-full bg-white/20 text-white"
-                  >
-                    <ThumbsUp className="w-5 h-5" />
-                  </Button>
+            <div
+              ref={chatContainerRef}
+              className="flex-1 overflow-y-auto p-4 space-y-3"
+            >
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex items-start gap-2.5">
+                  <Avatar className="w-7 h-7 flex-shrink-0">
+                    <AvatarImage src={comment.user_avatar} />
+                    <AvatarFallback className="text-xs bg-gradient-to-br from-rose-500 to-purple-600 text-white">{comment.user_name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-white font-semibold text-xs">{comment.user_name}</span>
+                      {comment.user_vip_tier && comment.user_vip_tier !== 'free' && (
+                        <Crown className="w-3 h-3 text-amber-500" />
+                      )}
+                    </div>
+                    <p className={cn(
+                      "text-xs break-words mt-0.5",
+                      comment.is_system ? 'text-purple-400' :
+                      comment.is_gift ? 'text-amber-400' :
+                      comment.is_dating_interest ? 'text-pink-400' : 'text-white/80'
+                    )}>
+                      {comment.message}
+                    </p>
+                  </div>
+                  <span className="text-white/30 text-[10px] flex-shrink-0">{formatTime(comment.created_at)}</span>
+                </div>
+              ))}
+              <div ref={commentsEndRef} />
+            </div>
 
-                  <Button
-                    onClick={() => setShowIcebreakers(true)}
-                    variant="ghost"
-                    size="sm"
-                    className="w-10 h-10 rounded-full bg-white/20 text-white"
-                  >
-                    <MessageCircle className="w-5 h-5" />
+            <div className="p-3 border-t border-white/10 bg-slate-950">
+              {replyToComment && (
+                <div className="flex items-center justify-between bg-purple-900/30 p-2 rounded-lg mb-2">
+                  <span className="text-xs text-white/80">
+                    Replying to @{replyToComment.user_name}
+                  </span>
+                  <Button onClick={() => setReplyToComment(null)} variant="ghost" size="sm" className="h-5 w-5 p-0">
+                    <X className="w-3 h-3" />
                   </Button>
                 </div>
-
+              )}
+              <div className="flex gap-2">
+                <Input
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
+                  placeholder="Say something nice..."
+                  className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-11"
+                />
                 <Button
-                  onClick={() => setIsChatVisible(!isChatVisible)}
-                  variant="ghost"
-                  size="sm"
-                  className="px-3 py-2 rounded-full bg-white/20 text-white flex items-center gap-1"
+                  onClick={handleSendComment}
+                  size="icon"
+                  className="bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white h-11 w-11 p-0 rounded-xl"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span className="text-xs">{comments.length}</span>
+                  <Send className="w-4 h-4" />
                 </Button>
               </div>
-
-              {isHost && (
-                <Button
-                  onClick={handleStopLive}
-                  className="mt-2 w-full bg-rose-600 text-white text-sm py-2 rounded-full"
-                >
-                  End Stream
-                </Button>
-              )}
             </div>
           </div>
 
@@ -1789,7 +1928,7 @@ const Live = () => {
                 animate={{ y: 0 }}
                 exit={{ y: "100%" }}
                 transition={{ type: "spring", damping: 25 }}
-                className="absolute bottom-0 left-0 right-0 h-2/3 bg-gray-900 rounded-t-2xl border-t border-white/10 flex flex-col z-20"
+                className="absolute bottom-0 left-0 right-0 h-2/3 bg-slate-950/95 backdrop-blur-xl rounded-t-3xl border-t border-white/10 flex flex-col z-20 lg:hidden"
               >
                 <div className="p-3 border-b border-white/10 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -2164,32 +2303,32 @@ const Live = () => {
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-b from-rose-50 to-purple-50 dark:from-gray-900 dark:to-gray-950">
         {/* Header */}
-        <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-rose-200 dark:border-rose-900/30">
-          <div className="px-4 py-3">
+        <div className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl border-b border-rose-100 dark:border-rose-900/20">
+          <div className="px-4 py-3 sm:py-4 max-w-7xl mx-auto">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <Button
                   onClick={() => navigate('/dashboard')}
                   variant="ghost"
-                  size="sm"
-                  className="lg:hidden text-gray-700 dark:text-gray-300"
+                  size="icon"
+                  className="lg:hidden rounded-full text-slate-700 dark:text-slate-300"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-rose-600 to-purple-600 bg-clip-text text-transparent">
-                    Live Dating
+                  <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-rose-600 to-purple-600 bg-clip-text text-transparent">
+                    Live
                   </h1>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    Connect in real-time
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Discover & connect in real-time
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <Button
                   onClick={() => setShowGoLive(true)}
-                  className="bg-gradient-to-r from-rose-500 to-purple-500 text-white text-sm h-9 px-3"
+                  className="bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white text-sm font-semibold h-10 px-4 rounded-full shadow-lg shadow-rose-500/25"
                 >
                   <Video className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Go Live</span>
@@ -2197,8 +2336,8 @@ const Live = () => {
                 <Button
                   onClick={() => setShowMobileMenu(true)}
                   variant="ghost"
-                  size="sm"
-                  className="lg:hidden"
+                  size="icon"
+                  className="lg:hidden rounded-full text-slate-700 dark:text-slate-300"
                 >
                   <Menu className="w-5 h-5" />
                 </Button>
@@ -2206,23 +2345,21 @@ const Live = () => {
             </div>
 
             {/* Categories */}
-            <div className="flex gap-2 overflow-x-auto mt-3 pb-1 scrollbar-hide">
+            <div className="flex gap-2 overflow-x-auto mt-4 pb-1 scrollbar-hide">
               {categories.map((category) => (
-                <Button
+                <button
                   key={category.value}
                   onClick={() => setSelectedCategory(category.value)}
-                  variant={selectedCategory === category.value ? 'default' : 'outline'}
-                  size="sm"
                   className={cn(
-                    "whitespace-nowrap flex items-center gap-1 rounded-full px-3 py-1.5 text-xs",
+                    "whitespace-nowrap flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all",
                     selectedCategory === category.value
-                      ? 'bg-gradient-to-r from-rose-500 to-purple-500 text-white'
-                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                      ? 'bg-gradient-to-r from-rose-500 to-purple-600 text-white shadow-md shadow-rose-500/20'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-700'
                   )}
                 >
                   {category.icon}
                   <span className="hidden xs:inline">{category.label}</span>
-                </Button>
+                </button>
               ))}
             </div>
           </div>
@@ -2273,7 +2410,7 @@ const Live = () => {
 
           {/* Live Streams Grid */}
           {!loading && (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredStreams.map((stream, index) => (
                 <motion.div
                   key={stream.id}
@@ -2281,70 +2418,65 @@ const Live = () => {
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ duration: 0.3, delay: index * 0.05 }}
                   onClick={() => handleJoinStream(stream)}
-                  className="cursor-pointer"
+                  className="group cursor-pointer"
                 >
-                  <Card className="border-0 shadow-md overflow-hidden bg-white dark:bg-gray-900">
-                    <div className="flex gap-3">
-                      {/* Thumbnail */}
-                      <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex-shrink-0">
-                        <LiveThumbnail
-                          stream={stream}
-                          className="w-full h-full object-cover"
-                        />
-                        
-                        {/* Room Type Badge */}
-                        <div className="absolute top-1 left-1">
-                          <Badge className="bg-black/50 backdrop-blur-sm text-white border-white/20 text-[10px] px-1 py-0">
-                            {getRoomTypeIcon(stream.room_type)}
-                          </Badge>
-                        </div>
+                  <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden bg-white dark:bg-slate-900 rounded-2xl">
+                    {/* Thumbnail */}
+                    <div className="relative aspect-[4/5]">
+                      <LiveThumbnail
+                        stream={stream}
+                        className="absolute inset-0 w-full h-full rounded-2xl"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent rounded-2xl" />
 
-                        {/* Viewer Count */}
-                        <div className="absolute bottom-1 right-1 flex items-center gap-0.5 px-1 py-0.5 rounded bg-black/50 backdrop-blur-sm text-white text-[10px]">
-                          <Eye className="w-2.5 h-2.5" />
-                          <span>{stream.viewer_count}</span>
+                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                        <Badge className="bg-black/40 backdrop-blur-md text-white border-white/20 text-[10px] px-2 py-0.5 h-5">
+                          {getRoomTypeIcon(stream.room_type)}
+                        </Badge>
+                      </div>
+
+                      <div className="absolute bottom-3 left-3 right-3">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="w-9 h-9 border-2 border-white/20">
+                            <AvatarImage src={stream.host_avatar} />
+                            <AvatarFallback className="text-xs bg-gradient-to-br from-rose-500 to-purple-600 text-white">{stream.host_name[0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-white font-semibold text-sm drop-shadow-md line-clamp-1">{stream.title}</h3>
+                            <div className="flex items-center gap-1.5 text-white/90 text-xs">
+                              <span className="drop-shadow-sm">{stream.host_name}</span>
+                              {stream.host_verified && (
+                                <Shield className="w-3 h-3 text-emerald-400 fill-emerald-500" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stream Info */}
+                    <CardContent className="p-3.5">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge className="text-[10px] bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border-0 font-medium">
+                          {stream.category}
+                        </Badge>
+                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                          <Clock className="w-3 h-3" />
+                          {formatDuration(Math.floor((Date.now() - new Date(stream.started_at).getTime()) / 1000))}
                         </div>
                       </div>
 
-                      {/* Stream Info */}
-                      <CardContent className="p-3 flex-1">
-                        <div className="flex items-start justify-between mb-1">
-                          <h3 className="font-semibold text-sm line-clamp-1 text-gray-900 dark:text-gray-100">
-                            {stream.title}
-                          </h3>
-                          <Badge className="text-[10px] bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border-0 ml-1">
-                            {stream.category}
-                          </Badge>
+                      {(stream.city || stream.country) && (
+                        <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                          <MapPin className="w-3 h-3" />
+                          <span>{getCountryFlag(stream.country)} {stream.city || stream.country}</span>
                         </div>
+                      )}
 
-                        <div className="flex items-center gap-2 mb-2">
-                          <Avatar className="w-5 h-5">
-                            <AvatarImage src={stream.host_avatar} />
-                            <AvatarFallback className="text-[10px]">{stream.host_name[0]}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-xs text-gray-600 dark:text-gray-400">{stream.host_name}</span>
-                          {stream.host_verified && (
-                            <Shield className="w-3 h-3 text-emerald-500" />
-                          )}
-                        </div>
-
-                        {(stream.city || stream.country) && (
-                          <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 mb-2">
-                            <MapPin className="w-2.5 h-2.5" />
-                            <span>{getCountryFlag(stream.country)} {stream.city || stream.country}</span>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-gray-500 dark:text-gray-400">
-                            {formatDuration(Math.floor((Date.now() - new Date(stream.started_at).getTime()) / 1000))}
-                          </span>
-                          <Button size="sm" className="h-7 px-3 text-xs bg-gradient-to-r from-rose-500 to-purple-500 text-white">
-                            Join
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </div>
+                      <Button className="w-full h-9 rounded-xl bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white text-sm font-semibold shadow-md shadow-rose-500/20">
+                        Join Live
+                      </Button>
+                    </CardContent>
                   </Card>
                 </motion.div>
               ))}
