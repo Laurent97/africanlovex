@@ -8,10 +8,11 @@ import {
   Send, Maximize2, Minimize2, Settings, ThumbsUp, Flame,
   Zap, Globe, MapPin, Clock, AlertCircle, Shield, ChevronDown,
   ChevronUp, Move, Pin, PinOff, Loader2, User, UserPlus, Menu, Lock,
-  Wifi, WifiOff, Volume2, VolumeX, Download, Award, Gem
+  Wifi, WifiOff, Volume2, VolumeX, Download, Award, Gem, BarChart3, Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -344,6 +345,145 @@ const GuestSlot: React.FC<{ guest?: RoomParticipant; onRemove?: () => void }> = 
   );
 };
 
+interface PollCreatorProps {
+  show: boolean;
+  onClose: () => void;
+  question: string;
+  setQuestion: (q: string) => void;
+  options: string[];
+  setOptions: (opts: string[]) => void;
+  onStart: () => void;
+}
+
+const PollCreator: React.FC<PollCreatorProps> = ({ show, onClose, question, setQuestion, options, setOptions, onStart }) => {
+  if (!show) return null;
+
+  const updateOption = (index: number, value: string) => {
+    const next = [...options];
+    next[index] = value;
+    setOptions(next);
+  };
+
+  const addOption = () => {
+    if (options.length < 4) setOptions([...options, '']);
+  };
+
+  const removeOption = (index: number) => {
+    if (options.length > 2) setOptions(options.filter((_, i) => i !== index));
+  };
+
+  const canStart = question.trim().length > 0 && options.filter(o => o.trim()).length >= 2;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      className="absolute bottom-24 left-3 right-3 sm:left-auto sm:right-3 sm:w-80 z-40 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-rose-400" />
+          Create Poll
+        </h3>
+        <Button onClick={onClose} variant="ghost" size="icon" className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10 rounded-full">
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="space-y-3">
+        <Input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Ask a question..."
+          className="bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-10"
+        />
+        {options.map((opt, i) => (
+          <div key={i} className="flex gap-2">
+            <Input
+              value={opt}
+              onChange={(e) => updateOption(i, e.target.value)}
+              placeholder={`Option ${i + 1}`}
+              className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-10"
+            />
+            {options.length > 2 && (
+              <Button onClick={() => removeOption(i)} variant="ghost" size="icon" className="h-10 w-10 text-white/70 hover:text-rose-400">
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        ))}
+        {options.length < 4 && (
+          <Button onClick={addOption} variant="outline" className="w-full border-white/10 text-white hover:bg-white/10 text-sm h-9">
+            <Plus className="w-4 h-4 mr-1.5" />
+            Add Option
+          </Button>
+        )}
+        <Button onClick={onStart} disabled={!canStart} className="w-full bg-gradient-to-r from-rose-500 to-purple-600 text-white text-sm h-10">
+          Start Poll
+        </Button>
+      </div>
+    </motion.div>
+  );
+};
+
+interface ActivePollPanelProps {
+  activePoll: { id: string; question: string; options: string[] };
+  pollVotes: Record<string, Record<string, number>>;
+  isHost: boolean;
+  onVote: (index: number) => void;
+  onEndPoll: () => void;
+}
+
+const ActivePollPanel: React.FC<ActivePollPanelProps> = ({ activePoll, pollVotes, isHost, onVote, onEndPoll }) => {
+  const currentVotes = pollVotes[activePoll.id] || {};
+  const total = Object.values(currentVotes).reduce((a, b) => a + b, 0);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="bg-gradient-to-br from-purple-900/90 to-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 mb-3 shadow-lg"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+          <BarChart3 className="w-4 h-4 text-rose-400" />
+          Live Poll
+        </h3>
+        {isHost && (
+          <Button onClick={onEndPoll} size="sm" variant="ghost" className="text-rose-400 hover:bg-rose-500/10 h-8 px-2 text-xs">
+            End Poll
+          </Button>
+        )}
+      </div>
+      <p className="text-white/90 text-sm font-medium mb-3">{activePoll.question}</p>
+      <div className="space-y-2">
+        {activePoll.options.map((option, index) => {
+          const count = currentVotes[index.toString()] || 0;
+          const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+          return (
+            <button
+              key={index}
+              onClick={() => !isHost && onVote(index)}
+              disabled={isHost}
+              className="w-full text-left group disabled:cursor-default"
+            >
+              <div className="flex items-center justify-between text-xs text-white/80 mb-1">
+                <span className="flex items-center gap-2">
+                  {!isHost && <ThumbsUp className="w-3 h-3 text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                  {option}
+                </span>
+                <span className="font-medium">{percentage}% ({count})</span>
+              </div>
+              <Progress value={percentage} className="h-2" />
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+};
+
 const Live = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -389,6 +529,11 @@ const Live = () => {
   const [newBannedWord, setNewBannedWord] = useState('');
   const [showModeration, setShowModeration] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<RoomParticipant | null>(null);
+  const [activePoll, setActivePoll] = useState<{ id: string; question: string; options: string[] } | null>(null);
+  const [pollVotes, setPollVotes] = useState<Record<string, Record<string, number>>>({});
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [newPollQuestion, setNewPollQuestion] = useState('');
+  const [newPollOptions, setNewPollOptions] = useState<string[]>(['', '']);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
@@ -754,18 +899,56 @@ const Live = () => {
         return;
       }
 
-      const loadedComments: LiveComment[] = (data || []).map((msg: any) => ({
-        id: msg.id,
-        user_id: msg.sender_id,
-        user_name: msg.sender?.full_name || msg.sender?.username || `User_${msg.sender_id?.slice(0, 8)}`,
-        user_avatar: msg.sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender?.username || 'User')}&background=B11D2D&color=fff`,
-        user_vip_tier: msg.sender?.vip_tier,
-        message: msg.content,
-        created_at: msg.created_at,
-        is_gift: msg.message_type === 'gift',
-        is_dating_interest: msg.message_type === 'dating_interest'
-      }));
+      let loadedActivePoll: { id: string; question: string; options: string[] } | null = null;
+      let loadedVotes: Record<string, Record<string, number>> = {};
+      const loadedComments: LiveComment[] = [];
 
+      (data || []).forEach((msg: any) => {
+        const content = msg.content || '';
+        if (msg.message_type === 'system') {
+          if (content.startsWith('POLL|')) {
+            try {
+              const poll = JSON.parse(content.slice(5));
+              if (poll.id && poll.question && Array.isArray(poll.options)) {
+                loadedActivePoll = { id: poll.id, question: poll.question, options: poll.options };
+                loadedVotes[poll.id] = {};
+              }
+            } catch (e) {
+              console.error('Error parsing poll:', e);
+            }
+            return;
+          }
+          if (content.startsWith('POLL_END|')) {
+            const pollId = content.split('|')[1];
+            if (loadedActivePoll?.id === pollId) loadedActivePoll = null;
+            return;
+          }
+          if (content.startsWith('VOTE|')) {
+            const parts = content.split('|');
+            const pollId = parts[1];
+            const optionIndex = parts[2];
+            if (pollId && optionIndex !== undefined) {
+              loadedVotes[pollId] = loadedVotes[pollId] || {};
+              loadedVotes[pollId][optionIndex] = (loadedVotes[pollId][optionIndex] || 0) + 1;
+            }
+            return;
+          }
+        }
+        loadedComments.push({
+          id: msg.id,
+          user_id: msg.sender_id,
+          user_name: msg.sender?.full_name || msg.sender?.username || `User_${msg.sender_id?.slice(0, 8)}`,
+          user_avatar: msg.sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.sender?.username || 'User')}&background=B11D2D&color=fff`,
+          user_vip_tier: msg.sender?.vip_tier,
+          message: msg.content,
+          created_at: msg.created_at,
+          is_gift: msg.message_type === 'gift',
+          is_dating_interest: msg.message_type === 'dating_interest'
+        });
+      });
+
+      setActivePoll(loadedActivePoll);
+      setPollVotes(loadedVotes);
       console.log('Loaded stream comments:', loadedComments.length);
       setComments(loadedComments);
     } catch (error) {
@@ -871,7 +1054,53 @@ const Live = () => {
     }
   };
 
+  const processPollMessage = (content: string) => {
+    if (content.startsWith('POLL|')) {
+      try {
+        const poll = JSON.parse(content.slice(5));
+        if (poll.id && poll.question && Array.isArray(poll.options)) {
+          setActivePoll({ id: poll.id, question: poll.question, options: poll.options });
+          setPollVotes({ [poll.id]: {} });
+        }
+      } catch (e) {
+        console.error('Error parsing poll:', e);
+      }
+      return;
+    }
+    if (content.startsWith('POLL_END|')) {
+      const pollId = content.split('|')[1];
+      setActivePoll(current => (current?.id === pollId ? null : current));
+      return;
+    }
+    if (content.startsWith('VOTE|')) {
+      const parts = content.split('|');
+      const pollId = parts[1];
+      const optionIndex = parts[2];
+      if (pollId && optionIndex !== undefined) {
+        setPollVotes(prev => {
+          const current = prev[pollId] || {};
+          return {
+            ...prev,
+            [pollId]: {
+              ...current,
+              [optionIndex]: (current[optionIndex] || 0) + 1
+            }
+          };
+        });
+      }
+      return;
+    }
+  };
+
   const handleNewComment = async (message: any) => {
+    if (!message) return;
+    if (message.message_type === 'system') {
+      const content = message.content || '';
+      if (content.startsWith('POLL|') || content.startsWith('VOTE|') || content.startsWith('POLL_END|')) {
+        processPollMessage(content);
+        return;
+      }
+    }
     if (!message?.sender_id) return;
     try {
       // For the current user, avoid an extra query by using the existing user object
@@ -1577,6 +1806,87 @@ const Live = () => {
     }
   };
 
+  const handleStartPoll = async () => {
+    if (!selectedStream || !user || !isHost || !newPollQuestion.trim()) return;
+    const validOptions = newPollOptions.map(o => o.trim()).filter(Boolean);
+    if (validOptions.length < 2 || validOptions.length > 4) {
+      toast({ title: 'Invalid Poll', description: 'A poll needs 2 to 4 options.', variant: 'destructive' });
+      return;
+    }
+
+    const pollId = `poll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const payload = JSON.stringify({ id: pollId, question: newPollQuestion.trim(), options: validOptions });
+
+    try {
+      const { error } = await supabase.from('messages').insert({
+        room_id: selectedStream.id,
+        sender_id: user.id,
+        content: `POLL|${payload}`,
+        message_type: 'system'
+      });
+
+      if (error) throw error;
+
+      setActivePoll({ id: pollId, question: newPollQuestion.trim(), options: validOptions });
+      setPollVotes({ [pollId]: {} });
+      setNewPollQuestion('');
+      setNewPollOptions(['', '']);
+      setShowPollCreator(false);
+
+      toast({ title: 'Poll Started', description: 'Viewers can now vote on your poll.' });
+    } catch (error) {
+      console.error('Error starting poll:', error);
+      toast({ title: 'Error', description: 'Failed to start poll.', variant: 'destructive' });
+    }
+  };
+
+  const handleVote = async (optionIndex: number) => {
+    if (!selectedStream || !user || !activePoll) return;
+
+    try {
+      const { error } = await supabase.from('messages').insert({
+        room_id: selectedStream.id,
+        sender_id: user.id,
+        content: `VOTE|${activePoll.id}|${optionIndex}`,
+        message_type: 'system'
+      });
+
+      if (error) throw error;
+
+      setPollVotes(prev => ({
+        ...prev,
+        [activePoll.id]: {
+          ...(prev[activePoll.id] || {}),
+          [optionIndex.toString()]: ((prev[activePoll.id]?.[optionIndex.toString()] || 0) + 1)
+        }
+      }));
+    } catch (error) {
+      console.error('Error voting:', error);
+      toast({ title: 'Error', description: 'Failed to submit vote.', variant: 'destructive' });
+    }
+  };
+
+  const handleEndPoll = async () => {
+    if (!selectedStream || !user || !activePoll || !isHost) return;
+
+    try {
+      const { error } = await supabase.from('messages').insert({
+        room_id: selectedStream.id,
+        sender_id: user.id,
+        content: `POLL_END|${activePoll.id}`,
+        message_type: 'system'
+      });
+
+      if (error) throw error;
+
+      setActivePoll(null);
+      toast({ title: 'Poll Ended', description: 'The poll has ended.' });
+    } catch (error) {
+      console.error('Error ending poll:', error);
+      toast({ title: 'Error', description: 'Failed to end poll.', variant: 'destructive' });
+    }
+  };
+
   const handleAddBannedWord = () => {
     if (!newBannedWord.trim()) return;
     const word = newBannedWord.trim().toLowerCase();
@@ -2079,6 +2389,15 @@ const Live = () => {
                       <Users className="w-4 h-4 mr-1.5" />
                       Multi-Guest
                     </Button>
+                    <Button
+                      onClick={() => setShowPollCreator(true)}
+                      variant="ghost"
+                      size="sm"
+                      className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium"
+                    >
+                      <BarChart3 className="w-4 h-4 mr-1.5" />
+                      Poll
+                    </Button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -2137,6 +2456,18 @@ const Live = () => {
             </div>
           </div>
 
+          {isHost && (
+            <PollCreator
+              show={showPollCreator}
+              onClose={() => setShowPollCreator(false)}
+              question={newPollQuestion}
+              setQuestion={setNewPollQuestion}
+              options={newPollOptions}
+              setOptions={setNewPollOptions}
+              onStart={handleStartPoll}
+            />
+          )}
+
           {/* Desktop Side Chat Panel */}
           <div className="hidden lg:flex w-[380px] h-full bg-slate-950 border-l border-white/10 flex-col z-10">
             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-slate-950">
@@ -2154,6 +2485,15 @@ const Live = () => {
               ref={chatContainerRef}
               className="flex-1 overflow-y-auto p-4 space-y-3"
             >
+              {activePoll && (
+                <ActivePollPanel
+                  activePoll={activePoll}
+                  pollVotes={pollVotes}
+                  isHost={isHost}
+                  onVote={handleVote}
+                  onEndPoll={handleEndPoll}
+                />
+              )}
               {visibleComments.map((comment) => (
                 <div key={comment.id} className="flex items-start gap-2.5">
                   <Avatar className="w-7 h-7 flex-shrink-0">
@@ -2244,6 +2584,15 @@ const Live = () => {
                   ref={chatContainerRef}
                   className="flex-1 overflow-y-auto p-3 space-y-3"
                 >
+                  {activePoll && (
+                    <ActivePollPanel
+                      activePoll={activePoll}
+                      pollVotes={pollVotes}
+                      isHost={isHost}
+                      onVote={handleVote}
+                      onEndPoll={handleEndPoll}
+                    />
+                  )}
                   {visibleComments.map((comment) => (
                     <div key={comment.id} className="flex items-start gap-2">
                       <Avatar className="w-6 h-6 flex-shrink-0">
