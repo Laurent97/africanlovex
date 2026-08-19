@@ -1381,8 +1381,8 @@ const Live = () => {
       }
 
       await supabase.from('coin_transactions').insert([
-        { user_id: user.id, amount: -gift.cost_coins, type: 'gift_sent', description: `Sent ${gift.name} to ${selectedStream.host_name}` },
-        { user_id: selectedStream.host_id, amount: Math.floor(gift.cost_coins * 0.9), type: 'gift_received', description: `Received ${gift.name} from ${user.email?.split('@')[0]}` }
+        { user_id: user.id, amount: -gift.cost_coins, transaction_type: 'gift_sent', description: `Sent ${gift.name} to ${selectedStream.host_name}` },
+        { user_id: selectedStream.host_id, amount: Math.floor(gift.cost_coins * 0.9), transaction_type: 'gift_received', description: `Received ${gift.name} from ${user.email?.split('@')[0]}` }
       ]);
 
       await supabase.from('messages').insert({
