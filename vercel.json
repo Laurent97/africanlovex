@@ -2,5 +2,11 @@
   "version": 2,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "build": {
+    "env": {
+      "VITE_PAYSTACK_CURRENCY": "KES",
+      "VITE_PAYSTACK_COUNTRY": "KE"
+    }
+  }
 }
