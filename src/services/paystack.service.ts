@@ -68,8 +68,8 @@ class PaystackService {
   };
 
   constructor() {
-    this.secretKey = import.meta.env.PAYSTACK_SECRET_KEY || '';
-    this.publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '';
+    this.secretKey = import.meta.env.PAYSTACK_SECRET_KEY || import.meta.env.VITE_PAYSTACK_SECRET_KEY || '';
+    this.publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || import.meta.env.PAYSTACK_PUBLIC_KEY || '';
     this.targetCurrency = import.meta.env.VITE_PAYSTACK_CURRENCY || 'NGN';
   }
 
