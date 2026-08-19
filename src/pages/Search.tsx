@@ -98,11 +98,15 @@ const Discover = () => {
     setLoading(true);
     try {
       // Get current user's profile to calculate distances and matches
-      const { data: currentUserProfile } = await supabase
+      const { data: currentUserProfile, error: currentUserError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (currentUserError) {
+        console.error('Error fetching current user profile:', currentUserError);
+      }
 
       // Query other profiles
       let query = supabase
