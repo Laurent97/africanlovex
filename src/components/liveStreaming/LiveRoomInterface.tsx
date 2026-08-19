@@ -270,284 +270,378 @@ export const LiveRoomInterface: React.FC<LiveRoomInterfaceProps> = ({
   }
 
   return (
-    <div className="h-screen flex flex-col bg-black">
+    <div className="fixed inset-0 z-10 flex flex-col bg-black text-white">
       {error && (
-        <Alert className="m-4">
+        <Alert className="absolute top-2 left-2 right-2 z-50 max-w-md mx-auto border-red-500/50 bg-red-950/90 text-white">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-gray-900 text-white">
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={host?.avatar_url || ''} />
-              <AvatarFallback>
-                {host?.username?.slice(0, 2).toUpperCase() || 'H'}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="font-medium">{room.title}</div>
-              <div className="text-sm text-gray-400">
-                {host?.username} • {viewerCount} viewers
-              </div>
-            </div>
+      <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between p-3 bg-gradient-to-b from-black/80 to-transparent">
+        <div className="flex items-center gap-2 min-w-0">
+          <Avatar className="h-9 w-9 border-2 border-white/20">
+            <AvatarImage src={host?.avatar_url || ''} />
+            <AvatarFallback>
+              {host?.username?.slice(0, 2).toUpperCase() || 'H'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold leading-tight">
+              {room.title}
+            </h1>
+            <p className="truncate text-xs text-gray-300">
+              @{host?.username} • {viewerCount} watching
+            </p>
           </div>
-          
-          <Badge variant="secondary">
-            {room.room_type === 'private' && <Lock className="w-3 h-3 mr-1" />}
-            {room.room_type === 'speed_dating' ? '⚡ Speed Dating' : 
-             room.room_type === 'private' ? '🔒 Private Room' : '🌍 Public Room'}
+          <Badge
+            variant="secondary"
+            className="hidden text-xs sm:inline-flex"
+          >
+            {room.room_type === 'private' && <Lock className="mr-1 h-3 w-3" />}
+            {room.room_type === 'speed_dating'
+              ? '⚡ Speed'
+              : room.room_type === 'private'
+              ? 'Private'
+              : 'Public'}
           </Badge>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           {room.cost_per_minute && isJoined && (
-            <div className="flex items-center text-yellow-400">
-              <Coins className="w-4 h-4 mr-1" />
-              <span className="font-medium">{totalCost} coins</span>
+            <div className="hidden items-center gap-1 rounded-full bg-black/40 px-2 py-1 text-xs text-yellow-400 sm:flex">
+              <Coins className="h-3 w-3" />
+              <span className="font-medium">{totalCost}</span>
             </div>
           )}
-          
-          <div className="flex items-center space-x-1">
+
+          {/* Desktop host controls */}
+          <div className="hidden items-center gap-1 md:flex">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={toggleVideo}
-              className="text-white hover:bg-gray-800"
+              className="h-9 w-9 rounded-full text-white hover:bg-white/20"
             >
-              {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+              {isVideoEnabled ? (
+                <Video className="h-4 w-4" />
+              ) : (
+                <VideoOff className="h-4 w-4" />
+              )}
             </Button>
-            
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={toggleAudio}
-              className="text-white hover:bg-gray-800"
+              className="h-9 w-9 rounded-full text-white hover:bg-white/20"
             >
-              {isAudioEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              {isAudioEnabled ? (
+                <Mic className="h-4 w-4" />
+              ) : (
+                <MicOff className="h-4 w-4" />
+              )}
             </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowGiftShop(!showGiftShop)}
-              className="text-white hover:bg-gray-800"
-            >
-              <Gift className="w-4 h-4" />
-            </Button>
-            
             {isHost && (
               <Button
-                variant="ghost"
                 size="sm"
                 onClick={handleEndRoom}
-                className="text-red-400 hover:bg-gray-800"
+                className="rounded-full bg-red-600 text-white hover:bg-red-700"
               >
-                End Room
+                End
               </Button>
             )}
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={isJoined ? handleLeave : onLeave}
-              className="text-white hover:bg-gray-800"
-            >
-              Leave
-            </Button>
           </div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex">
-        {/* Video Area */}
-        <div className="flex-1 relative bg-gray-800">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={isJoined ? handleLeave : onLeave}
+            className="rounded-full bg-black/40 text-white hover:bg-white/20"
+          >
+            Leave
+          </Button>
+        </div>
+      </header>
+
+      {/* Main stage */}
+      <main className="relative flex-1 overflow-hidden md:flex">
+        {/* Video / join screen */}
+        <section className="relative h-full w-full md:flex-1">
           {!isJoined ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center text-white">
-                <div className="mb-4">
-                  <Monitor className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                </div>
-                <h2 className="text-2xl font-bold mb-2">{room.title}</h2>
-                <p className="text-gray-400 mb-4">
-                  {room.description || 'Join this live room to interact with the host and other viewers'}
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-950 p-6">
+              <div className="max-w-sm text-center">
+                <Monitor className="mx-auto mb-4 h-16 w-16 text-gray-400" />
+                <h2 className="mb-2 text-2xl font-bold">{room.title}</h2>
+                <p className="mb-5 text-sm text-gray-400">
+                  {room.description ||
+                    'Join this live room to interact with the host and other viewers'}
                 </p>
-                
+
                 {room.cost_per_minute && (
-                  <div className="mb-4 p-3 bg-yellow-900/50 rounded-lg">
+                  <div className="mb-5 rounded-xl bg-yellow-900/30 p-3">
                     <div className="flex items-center justify-center text-yellow-400">
-                      <Coins className="w-5 h-5 mr-2" />
+                      <Coins className="mr-2 h-5 w-5" />
                       <span className="font-medium">
                         {room.cost_per_minute} coins per minute
                       </span>
                     </div>
                   </div>
                 )}
-                
+
                 <Button
                   onClick={handleJoin}
-                  className="bg-love-red hover:bg-love-red/90"
                   size="lg"
+                  className="rounded-full bg-love-red px-10 hover:bg-love-red/90"
                 >
                   Join Room
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="relative w-full h-full">
-              {/* Main video (host or featured participant) */}
+            <div className="relative h-full w-full">
               <video
                 ref={videoRef}
-                className="w-full h-full object-cover"
+                className="h-full w-full object-cover"
                 autoPlay
                 playsInline
                 muted={!isAudioEnabled}
               />
-              
-              {/* Overlay info */}
-              <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="bg-black/70 text-white px-3 py-1 rounded-full flex items-center">
-                    <Eye className="w-4 h-4 mr-1" />
-                    <span className="font-medium">{viewerCount}</span>
-                  </div>
-                  
-                  <div className="bg-black/70 text-white px-3 py-1 rounded-full flex items-center">
-                    <Clock className="w-4 h-4 mr-1" />
-                    <span className="font-medium">
-                      {viewingStartTime ? 
-                        Math.floor((Date.now() - viewingStartTime.getTime()) / 1000 / 60) + 'm' : 
-                        '0m'
-                      }
-                    </span>
-                  </div>
+
+              {/* Live & viewer pills */}
+              <div className="absolute left-3 top-14 z-20 flex items-center gap-2">
+                <Badge className="border-0 bg-rose-600 text-xs text-white">
+                  <span className="mr-1.5 h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                  LIVE
+                </Badge>
+                <Badge className="border-0 bg-black/60 text-xs text-white">
+                  <Eye className="mr-1 h-3 w-3" />
+                  {viewerCount}
+                </Badge>
+                {room.cost_per_minute && (
+                  <Badge className="border-0 bg-black/60 text-xs text-yellow-400">
+                    <Coins className="mr-1 h-3 w-3" />
+                    {totalCost}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Floating action buttons */}
+              <div className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col items-center gap-4">
+                <div className="flex flex-col items-center gap-1">
+                  <Button
+                    onClick={() => setShowGiftShop(true)}
+                    variant="ghost"
+                    size="icon"
+                    className="h-12 w-12 rounded-full border border-white/10 bg-white/10 text-white backdrop-blur-md hover:bg-white/20"
+                  >
+                    <Gift className="h-5 w-5 text-yellow-400" />
+                  </Button>
+                  <span className="text-[10px] text-white/90">Gift</span>
                 </div>
-                
-                <div className="flex items-center space-x-1">
-                  {!isVideoEnabled && (
-                    <div className="bg-red-500 text-white px-2 py-1 rounded text-sm">
-                      Video Off
-                    </div>
-                  )}
-                  {!isAudioEnabled && (
-                    <div className="bg-red-500 text-white px-2 py-1 rounded text-sm">
-                      Muted
-                    </div>
-                  )}
+                <div className="flex flex-col items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-14 w-14 rounded-full bg-love-red text-white shadow-lg shadow-rose-900/40 hover:bg-love-red/90"
+                  >
+                    <Heart className="h-6 w-6 fill-current" />
+                  </Button>
+                  <span className="text-[10px] text-white/90">Like</span>
                 </div>
               </div>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Chat Sidebar */}
-        <div className="w-80 bg-gray-900 flex flex-col">
-          {/* Chat Header */}
-          <div className="p-4 border-b border-gray-800">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center text-white">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                <span className="font-medium">Live Chat</span>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <div className="text-sm text-gray-400">
+        {/* Chat side / overlay panel */}
+        {isJoined && (
+          <aside className="absolute bottom-20 left-0 right-0 z-20 flex h-[32%] flex-col md:static md:h-full md:w-80">
+            <div className="flex h-full flex-col border-white/10 bg-gradient-to-t from-black/95 via-black/70 to-transparent md:bg-gray-900 md:border-l md:from-transparent">
+              {/* Chat header - desktop */}
+              <div className="hidden items-center justify-between border-b border-white/10 p-3 md:flex">
+                <div className="flex items-center text-sm font-medium">
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Live Chat
+                </div>
+                <span className="text-xs text-gray-400">
                   {viewerCount} viewers
+                </span>
+              </div>
+
+              {/* Messages */}
+              <div
+                ref={messagesContainerRef}
+                className="flex-1 space-y-2 overflow-y-auto p-3 pb-2"
+              >
+                {messages.map(message => (
+                  <div key={message.id} className="space-y-1">
+                    {message.type === 'system' && (
+                      <div className="py-2 text-center text-xs text-gray-400">
+                        <Separator className="my-2" />
+                        {message.message}
+                      </div>
+                    )}
+
+                    {message.type === 'gift' && (
+                      <div className="py-2 text-center">
+                        <div className="inline-flex items-center rounded-full bg-yellow-900/50 px-3 py-1.5 text-xs text-yellow-400">
+                          <Gift className="mr-1.5 h-3 w-3" />
+                          <span className="font-medium">{message.message}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {message.type === 'text' && (
+                      <div className="flex items-start gap-2">
+                        <Avatar className="h-7 w-7 flex-shrink-0">
+                          <AvatarImage src={message.avatar_url || ''} />
+                          <AvatarFallback className="text-[10px]">
+                            {message.username?.slice(0, 2).toUpperCase() || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-0.5 flex items-center gap-2">
+                            <span className="text-xs font-medium text-white">
+                              {message.username}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {formatTime(message.timestamp)}
+                            </span>
+                          </div>
+                          <p className="break-words text-sm text-white/90">
+                            {message.message}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Desktop message input */}
+              <div className="hidden border-t border-white/10 p-3 md:block">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    className="flex-1 border-gray-700 bg-gray-800 text-white placeholder:text-gray-400"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        sendMessage()
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={sendMessage}
+                    disabled={!newMessage.trim()}
+                    size="icon"
+                    className="bg-love-red hover:bg-love-red/90"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
-          </div>
+          </aside>
+        )}
 
-          {/* Messages */}
-          <div 
-            ref={messagesContainerRef}
-            className="flex-1 overflow-y-auto p-4 space-y-3"
-          >
-            {messages.map(message => (
-              <div key={message.id} className="space-y-1">
-                {message.type === 'system' && (
-                  <div className="text-center text-gray-400 text-sm py-2">
-                    <Separator className="my-2" />
-                    {message.message}
-                  </div>
-                )}
-                
-                {message.type === 'gift' && (
-                  <div className="text-center py-2">
-                    <div className="inline-flex items-center bg-yellow-900/50 text-yellow-400 px-3 py-2 rounded-full">
-                      <Gift className="w-4 h-4 mr-2" />
-                      <span className="font-medium">{message.message}</span>
-                    </div>
-                  </div>
-                )}
-                
-                {message.type === 'text' && (
-                  <div className="flex items-start space-x-2">
-                    <Avatar className="w-8 h-8 flex-shrink-0">
-                      <AvatarImage src={message.avatar_url || ''} />
-                      <AvatarFallback className="text-xs">
-                        {message.username?.slice(0, 2).toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-medium text-white text-sm">
-                          {message.username}
-                        </span>
-                        <span className="text-gray-400 text-xs">
-                          {formatTime(message.timestamp)}
-                        </span>
-                      </div>
-                      <p className="text-white text-sm break-words">
-                        {message.message}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* Message Input */}
-          {isJoined && (
-            <div className="p-4 border-t border-gray-800">
-              <div className="flex items-center space-x-2">
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      sendMessage()
-                    }
-                  }}
-                />
-                
-                <Button
-                  onClick={sendMessage}
-                  disabled={!newMessage.trim()}
-                  size="sm"
-                  className="bg-love-red hover:bg-love-red/90"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
+        {/* Mobile bottom sheet */}
+        {isJoined && (
+          <div className="absolute bottom-0 left-0 right-0 z-30 md:hidden">
+            <div className="flex items-center gap-2 bg-gradient-to-t from-black via-black/90 to-transparent p-3">
+              {isHost ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleVideo}
+                    className="h-11 w-11 flex-1 rounded-2xl text-white hover:bg-white/10"
+                  >
+                    {isVideoEnabled ? (
+                      <Video className="h-5 w-5" />
+                    ) : (
+                      <VideoOff className="h-5 w-5" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleAudio}
+                    className="h-11 w-11 flex-1 rounded-2xl text-white hover:bg-white/10"
+                  >
+                    {isAudioEnabled ? (
+                      <Mic className="h-5 w-5" />
+                    ) : (
+                      <MicOff className="h-5 w-5" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 flex-1 rounded-2xl text-white hover:bg-white/10"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleEndRoom}
+                    className="flex-1 rounded-2xl bg-red-600 text-white hover:bg-red-700"
+                  >
+                    End
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleLeave}
+                    className="flex-1 rounded-2xl bg-white/10 text-white hover:bg-white/20"
+                  >
+                    Leave
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Say something..."
+                    className="flex-1 rounded-full border-white/10 bg-white/10 text-white placeholder:text-white/60"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        sendMessage()
+                      }
+                    }}
+                  />
+                  <Button
+                    onClick={() => setShowGiftShop(true)}
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 rounded-full bg-white/10 text-yellow-400 hover:bg-white/20"
+                  >
+                    <Gift className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    onClick={sendMessage}
+                    disabled={!newMessage.trim()}
+                    size="icon"
+                    className="h-11 w-11 rounded-full bg-love-red hover:bg-love-red/90"
+                  >
+                    <Send className="h-5 w-5" />
+                  </Button>
+                </>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
+      </main>
 
       {/* Gift Shop Modal */}
       {showGiftShop && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 md:items-center md:p-4">
+          <div className="h-[85vh] w-full overflow-hidden rounded-t-2xl bg-white md:h-[90vh] md:max-w-4xl md:rounded-2xl">
             <GiftShop
               recipientId={host?.id}
               onGiftSent={handleGiftSent}
