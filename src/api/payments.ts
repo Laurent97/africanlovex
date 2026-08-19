@@ -51,7 +51,7 @@ class PaymentsApi {
           email: paymentData.email,
           fullname: paymentData.fullname,
           tx_ref: paymentData.tx_ref,
-          country: (paymentData.meta?.country as string) || 'RW',
+          country: (paymentData.meta?.country as string) || (import.meta.env.VITE_PAYSTACK_COUNTRY as string) || 'KE',
           meta: paymentData.meta
         };
 

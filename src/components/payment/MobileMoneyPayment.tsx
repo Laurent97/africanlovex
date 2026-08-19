@@ -78,6 +78,20 @@ const COUNTRY_CONFIG = {
   Ghana: { currency: 'GHS', flag: '🇬🇭', name: 'Ghana' }
 };
 
+const COUNTRY_CODE_MAP: Record<string, string> = {
+  KE: 'Kenya',
+  NG: 'Nigeria',
+  GH: 'Ghana',
+  UG: 'Uganda',
+  TZ: 'Tanzania',
+  RW: 'Rwanda',
+  BI: 'Burundi',
+  CD: 'DRC'
+};
+
+const MERCHANT_COUNTRY_CODE = (import.meta.env.VITE_PAYSTACK_COUNTRY || 'KE').toUpperCase();
+const MERCHANT_COUNTRY = COUNTRY_CODE_MAP[MERCHANT_COUNTRY_CODE] || 'Kenya';
+
 export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
   amount,
   currency = 'RWF',
@@ -86,23 +100,20 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
   onClose
 }) => {
   const [step, setStep] = useState(1);
-  const [selectedCountry, setSelectedCountry] = useState('Rwanda');
+  const [selectedCountry, setSelectedCountry] = useState(MERCHANT_COUNTRY);
   const [selectedNetwork, setSelectedNetwork] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [transactionRef, setTransactionRef] = useState('');
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-  
+
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Auto-select country based on currency
+  // Mobile money is only available for the merchant's own country
   useEffect(() => {
-    const country = Object.entries(COUNTRY_CONFIG).find(
-      ([_, config]) => config.currency === currency
-    )?.[0] || 'Rwanda';
-    setSelectedCountry(country);
-  }, [currency]);
+    setSelectedCountry(MERCHANT_COUNTRY);
+  }, []);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -185,7 +196,7 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
 
       const result = await paymentsApi.initiatePayment({
         amount,
-        currency: COUNTRY_CONFIG[selectedCountry as keyof typeof COUNTRY_CONFIG].currency,
+        currency,
         email: user?.email || '',
         fullname: user?.user_metadata?.full_name || user?.user_metadata?.username || 'User',
         tx_ref,
@@ -195,7 +206,7 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
           user_id: user?.id,
           phone_number: formattedPhone,
           network: selectedNetwork,
-          country: selectedCountry
+          country: MERCHANT_COUNTRY_CODE
         }
       });
       
@@ -315,17 +326,19 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
                       <SelectValue placeholder="Select your country" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(COUNTRY_CONFIG).map(([code, config]) => (
-                        <SelectItem key={code} value={code}>
-                          <div className="flex items-center gap-2">
-                            <span>{config.flag}</span>
-                            <span>{config.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {config.currency}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {Object.entries(COUNTRY_CONFIG)
+                        .filter(([code]) => code === MERCHANT_COUNTRY)
+                        .map(([code, config]) => (
+                          <SelectItem key={code} value={code}>
+                            <div className="flex items-center gap-2">
+                              <span>{config.flag}</span>
+                              <span>{config.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {config.currency}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
