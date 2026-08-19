@@ -117,7 +117,6 @@ interface Transaction {
   currency?: string;
   reference?: string;
   fee?: number;
-  flutterwave_reference?: string;
 }
 
 interface PaymentMethod {
@@ -271,8 +270,7 @@ const Wallet = () => {
             status: pt.status as 'completed' | 'pending' | 'failed',
             paymentMethod: pt.payment_method,
             currency: pt.currency,
-            reference: pt.transaction_reference,
-            flutterwave_reference: pt.flutterwave_reference
+            reference: pt.transaction_reference
           });
         });
 
@@ -302,7 +300,7 @@ const Wallet = () => {
             status: wr.status as 'completed' | 'pending' | 'failed',
             paymentMethod: wr.payment_method,
             currency: wr.currency,
-            reference: wr.flutterwave_reference,
+            reference: wr.reference || wr.id,
             fee: wr.fee
           });
         });

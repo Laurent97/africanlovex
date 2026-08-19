@@ -159,23 +159,9 @@ class PaymentsApi {
   /**
    * Get banks list
    */
-  async getBanks(country: string = 'RW'): Promise<PaymentResponse> {
+  async getBanks(country: string = import.meta.env.VITE_PAYSTACK_COUNTRY || 'NG'): Promise<PaymentResponse> {
     try {
-      const response = await fetch(`/api/flutterwave/banks?country=${country}`);
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        return {
-          status: 'success',
-          message: 'Banks retrieved successfully',
-          data: data.data
-        };
-      } else {
-        return {
-          status: 'error',
-          message: data.error || 'Failed to retrieve banks'
-        };
-      }
+      return await paystackService.getBanks(country);
     } catch (error: unknown) {
       return {
         status: 'error',

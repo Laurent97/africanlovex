@@ -328,6 +328,44 @@ class PaystackService {
   }
 
   /**
+   * Get banks for a country
+   */
+  async getBanks(country: string = 'NG'): Promise<PaystackResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/bank?country=${country}`, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.status) {
+        return {
+          status: 'error',
+          message: result.message || 'Failed to retrieve banks'
+        };
+      }
+
+      const banks = (result.data as any[]).map((bank: any) => ({
+        id: bank.id,
+        code: bank.code,
+        name: bank.name,
+        country: bank.country
+      }));
+
+      return {
+        status: 'success',
+        message: 'Banks retrieved successfully',
+        data: banks
+      };
+    } catch (error: unknown) {
+      return {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Failed to retrieve banks'
+      };
+    }
+  }
+
+  /**
    * Verify account number. Stub for test mode.
    */
   async verifyAccount(_accountNumber: string, _bankCode: string): Promise<PaystackResponse> {

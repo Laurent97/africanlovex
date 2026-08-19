@@ -373,7 +373,7 @@ export const MobileMoneyPayment: React.FC<MobileMoneyPaymentProps> = ({
                   <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-green-600" />
                     <span className="text-sm text-green-800">
-                      Secured by Flutterwave
+                      Secured by Paystack
                     </span>
                   </div>
                 </div>
