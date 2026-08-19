@@ -1843,25 +1843,33 @@ const Live = () => {
     }
   };
 
+  const uploadImageToCloudinary = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+    formData.append('file', file);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: 'POST', body: formData }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.secure_url;
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedStream || !user || isPractice) return;
 
     try {
       setIsUploading(true);
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+      const secureUrl = await uploadImageToCloudinary(file);
 
-      const { error: uploadError } = await supabase.storage
-        .from('chat-images')
-        .upload(fileName, file, { upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('chat-images').getPublicUrl(fileName);
-      const publicUrl = data.publicUrl;
-
-      await handleSendImageMessage(publicUrl);
+      await handleSendImageMessage(secureUrl);
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {

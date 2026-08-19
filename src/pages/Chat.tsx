@@ -43,6 +43,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useKeyboard } from '@/hooks/useKeyboard';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 import VerificationBadge from '@/components/verification/VerificationBadge';
 import GiftSender from '@/components/gifts/GiftSender';
 
@@ -94,6 +95,7 @@ const Chat = () => {
   const { chatId } = useParams<{ chatId: string }>();
   const navigate = useNavigate();
   const { isKeyboardVisible } = useKeyboard();
+  const { toast } = useToast();
   
   const [selectedChat, setSelectedChat] = useState<string | null>(chatId || null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -422,32 +424,38 @@ const Chat = () => {
     }
   };
 
+  const uploadImageToCloudinary = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+    formData.append('file', file);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: 'POST', body: formData }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Cloudinary upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.secure_url;
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setUploadingImage(true);
     try {
-      // Upload image to Supabase storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('chat-images')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-images')
-        .getPublicUrl(fileName);
+      const secureUrl = await uploadImageToCloudinary(file);
 
       // Send image message
       const { data, error } = await supabase
         .rpc('send_message', {
           sender_uuid: user?.id,
           receiver_uuid: selectedChat,
-          content: publicUrl,
+          content: secureUrl,
           message_type: 'image'
         });
 
@@ -455,7 +463,7 @@ const Chat = () => {
 
       const imageMessage: Message = {
         id: data.id,
-        text: publicUrl,
+        text: secureUrl,
         sender: user?.id || '',
         receiver: selectedChat || '',
         timestamp: new Date(),
@@ -471,7 +479,7 @@ const Chat = () => {
 
     } catch (err) {
       console.error('Failed to upload image:', err);
-      setError('Failed to upload image');
+      toast({ title: 'Upload Failed', description: 'Could not upload image.', variant: 'destructive' });
     } finally {
       setUploadingImage(false);
     }
