@@ -298,6 +298,12 @@ class PaystackService {
     }
 
     try {
+      // 6% network fee is deducted from the withdrawal amount
+      const feeRate = 0.06;
+      const grossAmount = withdrawalData.amount;
+      const fee = Math.round(grossAmount * feeRate * 100) / 100;
+      const netAmount = Math.round((grossAmount - fee) * 100) / 100;
+
       // For test keys, Paystack transfers may not be enabled. Return a simulated success.
       console.warn('Paystack withdrawals are not fully implemented; returning test success.', withdrawalData);
       return {
@@ -305,7 +311,10 @@ class PaystackService {
         message: 'Withdrawal request received (test mode)',
         data: {
           reference: withdrawalData.reference,
-          status: 'pending'
+          status: 'pending',
+          amount: grossAmount,
+          fee,
+          netAmount
         }
       };
     } catch (error: unknown) {

@@ -678,17 +678,20 @@ const Wallet = () => {
       });
 
       if (data.status === 'success' && data.data) {
+        const fee = data.data.fee || amount * 0.06;
+        const netAmount = data.data.netAmount || (amount - fee);
+
         const newTransaction: Transaction = {
           id: Date.now().toString(),
           type: 'withdrawal',
-          amount: amount,
+          amount: netAmount,
           coins: -coinsNeeded,
-          description: `Withdrawal to ${withdrawMethod === 'bank' ? 'Bank Account' : 'Mobile Money'}`,
+          description: `Withdrawal of $${amount} (fee: $${fee}) to ${withdrawMethod === 'bank' ? 'Bank Account' : 'Mobile Money'}`,
           timestamp: new Date(),
           status: 'processing',
           paymentMethod: withdrawMethod === 'bank' ? 'Bank Transfer' : 'Mobile Money',
           reference: data.data.reference,
-          fee: data.data.fee || amount * 0.02
+          fee
         };
 
         setTransactions(prev => [newTransaction, ...prev]);
@@ -696,7 +699,7 @@ const Wallet = () => {
 
         toast({
           title: "Withdrawal Initiated",
-          description: `Your withdrawal of $${amount} is being processed.`,
+          description: `Your withdrawal of $${netAmount} is being processed (fee: $${fee}).`,
         });
 
         setShowWithdrawModal(false);

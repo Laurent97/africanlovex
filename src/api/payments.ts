@@ -36,6 +36,12 @@ class PaymentsApi {
         };
       }
 
+      // 6% network fee is added to the customer's charge
+      const feeRate = 0.06;
+      const baseAmount = paymentData.amount;
+      const totalAmount = Math.round(baseAmount * (1 + feeRate) * 100) / 100;
+      const networkFee = Math.round((totalAmount - baseAmount) * 100) / 100;
+
       let result: PaymentResponse;
 
       // For mobile money payments
@@ -44,7 +50,7 @@ class PaymentsApi {
           paymentData.payment_method.startsWith('mpesa')) {
 
         const mobileMoneyData: MobileMoneyPayment = {
-          amount: paymentData.amount,
+          amount: totalAmount,
           currency: paymentData.currency as 'RWF' | 'UGX' | 'KES' | 'GHS' | 'NGN' | 'USD',
           phone_number: paymentData.meta?.phone_number || '',
           network: paymentData.payment_method.toUpperCase() as 'MTN' | 'AIRTEL' | 'MPESA',
@@ -60,7 +66,7 @@ class PaymentsApi {
       // For card payments, create payment link
       else if (paymentData.payment_method === 'card') {
         result = await paystackService.createPaymentLink({
-          amount: paymentData.amount,
+          amount: totalAmount,
           currency: paymentData.currency,
           email: paymentData.email,
           fullname: paymentData.fullname,
@@ -70,7 +76,7 @@ class PaymentsApi {
       // Other payment methods
       else {
         result = await paystackService.createPaymentLink({
-          amount: paymentData.amount,
+          amount: totalAmount,
           currency: paymentData.currency,
           email: paymentData.email,
           fullname: paymentData.fullname,
@@ -86,7 +92,7 @@ class PaymentsApi {
         const { error: insertError } = await supabase.from('payment_transactions').insert({
           user_id: userId,
           transaction_id: reference,
-          amount: paymentData.amount,
+          amount: totalAmount,
           currency: paymentData.currency,
           status: 'pending',
           payment_method: paymentData.payment_method,
@@ -96,7 +102,9 @@ class PaymentsApi {
             purpose: (paymentData.meta?.purpose as string) || 'general',
             paystack_reference: reference,
             authorization_url: data.authorization_url || data.payment_link || data.link,
-            initialized_at: new Date().toISOString()
+            initialized_at: new Date().toISOString(),
+            base_amount: baseAmount,
+            network_fee: networkFee
           }
         });
 
