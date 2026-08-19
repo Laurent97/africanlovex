@@ -1247,8 +1247,28 @@ CREATE POLICY "Admins update withdrawals" ON public.withdrawal_requests
   FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
 
 DROP POLICY IF EXISTS "Admins view all messages" ON public.messages;
+DROP POLICY IF EXISTS "Admins delete messages" ON public.messages;
 CREATE POLICY "Admins view all messages" ON public.messages
   FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins delete messages" ON public.messages
+  FOR DELETE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+DROP POLICY IF EXISTS "Admins view all room participants" ON public.room_participants;
+DROP POLICY IF EXISTS "Admins update room participants" ON public.room_participants;
+DROP POLICY IF EXISTS "Admins delete room participants" ON public.room_participants;
+CREATE POLICY "Admins view all room participants" ON public.room_participants
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins update room participants" ON public.room_participants
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins delete room participants" ON public.room_participants
+  FOR DELETE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+DROP POLICY IF EXISTS "Admins view room reports" ON public.room_reports;
+DROP POLICY IF EXISTS "Admins update room reports" ON public.room_reports;
+CREATE POLICY "Admins view room reports" ON public.room_reports
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins update room reports" ON public.room_reports
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
 
 -- ============================================================================
 -- DONE! Verify with:

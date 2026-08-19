@@ -334,3 +334,170 @@ export async function rejectVerification(id: string, reason: string): Promise<vo
 
   await logAdminAction('Reject verification', 'verification', id, { user_id: attempt.user_id, reason });
 }
+
+export interface LiveRoom {
+  id: string;
+  host_id: string;
+  title: string;
+  host_name?: string | null;
+  is_active: boolean;
+  started_at?: string | null;
+  viewer_count?: number;
+  created_at?: string;
+  host?: { username?: string | null; full_name?: string | null } | null;
+}
+
+export interface RoomParticipant {
+  id: string;
+  room_id: string;
+  user_id: string;
+  role?: string;
+  is_host?: boolean;
+  is_muted?: boolean;
+  joined_at?: string;
+  left_at?: string | null;
+  user?: { username?: string | null; full_name?: string | null } | null;
+}
+
+export interface RoomReport {
+  id: string;
+  room_id: string;
+  reporter_id: string;
+  reason: string;
+  created_at: string;
+  reporter?: { username?: string | null; full_name?: string | null } | null;
+}
+
+export interface AdminMessage {
+  id: string;
+  content: string;
+  message_type: string;
+  created_at: string;
+  sender_id?: string | null;
+  receiver_id?: string | null;
+  conversation_id?: string | null;
+  room_id?: string | null;
+  sender?: { username?: string | null; full_name?: string | null } | null;
+  room?: { title?: string | null } | null;
+}
+
+export interface GetMessagesParams {
+  messageType?: string;
+  search?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetMessagesResult {
+  data: AdminMessage[];
+  count: number;
+}
+
+export interface GetLiveRoomsResult {
+  data: LiveRoom[];
+  count: number;
+}
+
+export async function getLiveRooms(params: { active?: boolean } = {}): Promise<GetLiveRoomsResult> {
+  let query = (supabase as any)
+    .from('live_rooms')
+    .select('*, host:profiles!left(username, full_name)', { count: 'exact' })
+    .order('started_at', { ascending: false });
+
+  if (params.active === true) {
+    query = query.eq('is_active', true);
+  } else if (params.active === false) {
+    query = query.eq('is_active', false);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as LiveRoom[],
+    count: count ?? 0,
+  };
+}
+
+export async function getRoomParticipants(roomId: string): Promise<RoomParticipant[]> {
+  const { data, error } = await (supabase as any)
+    .from('room_participants')
+    .select('*, user:profiles!user_id(username, full_name)')
+    .eq('room_id', roomId)
+    .is('left_at', null)
+    .order('joined_at', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as RoomParticipant[];
+}
+
+export async function terminateRoom(roomId: string): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await (supabase as any)
+    .from('live_rooms')
+    .update({ is_active: false, ended_at: now })
+    .eq('id', roomId);
+
+  if (error) throw error;
+  await logAdminAction('Terminate room', 'live_room', roomId, { ended_at: now });
+}
+
+export async function removeParticipant(roomId: string, userId: string): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('room_participants')
+    .delete()
+    .eq('room_id', roomId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+  await logAdminAction('Remove room participant', 'room_participant', roomId, { user_id: userId });
+}
+
+export async function getRoomReports(roomId: string): Promise<RoomReport[]> {
+  const { data, error } = await (supabase as any)
+    .from('room_reports')
+    .select('*, reporter:profiles!reporter_id(username, full_name)')
+    .eq('room_id', roomId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as RoomReport[];
+}
+
+export async function getMessages(params: GetMessagesParams = {}): Promise<GetMessagesResult> {
+  const { messageType = '', search = '', page = 1, perPage = 20 } = params;
+
+  let query = (supabase as any)
+    .from('messages')
+    .select(
+      `*,
+      sender:profiles!sender_id(username, full_name),
+      room:live_rooms!left(title)`,
+      { count: 'exact' }
+    )
+    .order('created_at', { ascending: false });
+
+  if (messageType) {
+    query = query.eq('message_type', messageType);
+  }
+
+  if (search.trim()) {
+    query = query.ilike('content', `%${search.trim()}%`);
+  }
+
+  const start = (page - 1) * perPage;
+  const { data, error, count } = await query.range(start, start + perPage - 1);
+
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as AdminMessage[],
+    count: count ?? 0,
+  };
+}
+
+export async function deleteMessage(id: string): Promise<void> {
+  const { error } = await (supabase as any).from('messages').delete().eq('id', id);
+  if (error) throw error;
+  await logAdminAction('Delete message', 'message', id, {});
+}

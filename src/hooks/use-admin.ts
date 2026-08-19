@@ -5,6 +5,10 @@ import {
   getReports,
   getReportDetails,
   getVerificationAttempts,
+  getLiveRooms,
+  getRoomParticipants,
+  getRoomReports,
+  getMessages,
   type AdminStats,
   type AdminUser,
   type GetUsersParams,
@@ -12,6 +16,11 @@ import {
   type GetReportsParams,
   type VerificationAttempt,
   type GetVerificationAttemptsParams,
+  type LiveRoom,
+  type RoomParticipant,
+  type RoomReport,
+  type AdminMessage,
+  type GetMessagesParams,
 } from '@/lib/admin';
 
 export function useAdminStats() {
@@ -162,4 +171,130 @@ export function useVerificationAttempts(params: GetVerificationAttemptsParams) {
   }, [fetch]);
 
   return { attempts, count, loading, error, refetch: fetch };
+}
+
+export function useLiveRooms(active?: boolean) {
+  const [rooms, setRooms] = useState<LiveRoom[]>([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useMemo(
+    () => async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getLiveRooms({ active });
+        setRooms(result.data);
+        setCount(result.count);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load live rooms');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [active]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { rooms, count, loading, error, refetch: fetch };
+}
+
+export function useRoomParticipants(roomId?: string) {
+  const [participants, setParticipants] = useState<RoomParticipant[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useMemo(
+    () => async () => {
+      if (!roomId) {
+        setParticipants([]);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getRoomParticipants(roomId);
+        setParticipants(data);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load participants');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [roomId]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { participants, loading, error, refetch: fetch };
+}
+
+export function useRoomReports(roomId?: string) {
+  const [reports, setReports] = useState<RoomReport[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = useMemo(
+    () => async () => {
+      if (!roomId) {
+        setReports([]);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getRoomReports(roomId);
+        setReports(data);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load room reports');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [roomId]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { reports, loading, error, refetch: fetch };
+}
+
+export function useMessages(params: GetMessagesParams) {
+  const [messages, setMessages] = useState<AdminMessage[]>([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { messageType, search, page, perPage } = params;
+
+  const fetch = useMemo(
+    () => async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getMessages({ messageType, search, page, perPage });
+        setMessages(result.data);
+        setCount(result.count);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load messages');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [messageType, search, page, perPage]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { messages, count, loading, error, refetch: fetch };
 }
