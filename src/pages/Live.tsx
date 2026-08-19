@@ -725,8 +725,10 @@ const Live = () => {
         is_dating_interest: msg.message_type === 'dating_interest'
       }));
 
+      console.log('Loaded stream comments:', loadedComments.length);
       setComments(loadedComments);
     } catch (error) {
+      console.error('Error loading stream comments:', error);
       setComments([]);
     }
   };
@@ -830,25 +832,43 @@ const Live = () => {
 
   const handleNewComment = async (message: any) => {
     if (!message?.sender_id) return;
-    const { data: sender } = await supabase
-      .from('profiles')
-      .select('username, full_name, avatar_url, vip_tier')
-      .eq('id', message.sender_id)
-      .single();
+    try {
+      // For the current user, avoid an extra query by using the existing user object
+      let sender;
+      if (user && user.id === message.sender_id) {
+        sender = {
+          username: user.user_metadata?.username || user.email?.split('@')[0] || 'User',
+          full_name: user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0] || 'User',
+          avatar_url: user.user_metadata?.avatar_url,
+          vip_tier: user.user_metadata?.vip_tier
+        };
+      } else {
+        const { data } = await supabase
+          .from('profiles')
+          .select('username, full_name, avatar_url, vip_tier')
+          .eq('id', message.sender_id)
+          .single();
+        sender = data;
+      }
 
-    const newComment: LiveComment = {
-      id: message.id,
-      user_id: message.sender_id,
-      user_name: sender?.full_name || sender?.username || `User_${message.sender_id?.slice(0, 8)}`,
-      user_avatar: sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sender?.username || 'User')}&background=B11D2D&color=fff`,
-      user_vip_tier: sender?.vip_tier,
-      message: message.content,
-      created_at: message.created_at,
-      is_gift: message.message_type === 'gift',
-      is_dating_interest: message.message_type === 'dating_interest'
-    };
+      const newComment: LiveComment = {
+        id: message.id,
+        user_id: message.sender_id,
+        user_name: sender?.full_name || sender?.username || `User_${message.sender_id?.slice(0, 8)}`,
+        user_avatar: sender?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sender?.username || 'User')}&background=B11D2D&color=fff`,
+        user_vip_tier: sender?.vip_tier,
+        message: message.content,
+        created_at: message.created_at,
+        is_gift: message.message_type === 'gift',
+        is_dating_interest: message.message_type === 'dating_interest'
+      };
 
-    setComments(prev => [...prev, newComment]);
+      setComments(prev =>
+        prev.some(c => c.id === newComment.id) ? prev : [...prev, newComment]
+      );
+    } catch (error) {
+      console.error('Error adding new comment:', error);
+    }
   };
 
   const addSystemMessage = (message: string) => {
@@ -1330,22 +1350,28 @@ const Live = () => {
 
       if (error) {
         console.error('Database error sending message:', error);
-        toast({ 
-          title: 'Error', 
-          description: `Failed to send message: ${error.message}`, 
-          variant: 'destructive' 
+        toast({
+          title: 'Error',
+          description: `Failed to send message: ${error.message}`,
+          variant: 'destructive'
         });
         return;
       }
 
       console.log('Message sent successfully:', data);
+
+      // Show the message in chat immediately
+      if (data) {
+        await handleNewComment(data);
+      }
+
       setNewComment('');
       setReplyToComment(null);
-      
-      toast({ 
-        title: 'Message Sent', 
+
+      toast({
+        title: 'Message Sent',
         description: 'Your message was sent successfully!',
-        variant: 'default' 
+        variant: 'default'
       });
     } catch (error) {
       console.error('Error sending comment:', error);
@@ -1475,18 +1501,27 @@ const Live = () => {
 
   const handleLike = async () => {
     if (!selectedStream || !user) return;
-    await supabase.from('messages').insert({ 
-      room_id: selectedStream.id, 
-      sender_id: user.id, 
-      content: '❤️', 
-      message_type: 'text' 
-    });
-    
-    const heartElement = document.createElement('div');
-    heartElement.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
-    heartElement.innerHTML = '<div class="text-7xl sm:text-9xl animate-ping">❤️</div>';
-    document.body.appendChild(heartElement);
-    setTimeout(() => heartElement.remove(), 1000);
+    try {
+      const { data, error } = await supabase.from('messages').insert({
+        room_id: selectedStream.id,
+        sender_id: user.id,
+        content: '❤️',
+        message_type: 'dating_interest'
+      }).select().single();
+
+      if (error) throw error;
+
+      // Show the like in chat immediately
+      if (data) handleNewComment(data);
+
+      const heartElement = document.createElement('div');
+      heartElement.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
+      heartElement.innerHTML = '<div class="text-7xl sm:text-9xl animate-ping">❤️</div>';
+      document.body.appendChild(heartElement);
+      setTimeout(() => heartElement.remove(), 1000);
+    } catch (error) {
+      console.error('Error sending like:', error);
+    }
   };
 
   const handleShare = () => {
@@ -1721,7 +1756,11 @@ const Live = () => {
                     <div className="w-12 h-12 rounded-full bg-rose-500/90 backdrop-blur-md shadow-lg shadow-rose-500/30 flex items-center justify-center text-white group-hover:scale-110 transition-transform">
                       <Heart className="w-6 h-6 fill-current" />
                     </div>
-                    <span className="text-white text-[10px] font-medium drop-shadow-md">Like</span>
+                    <span className="text-white text-[10px] font-medium drop-shadow-md">
+                      {comments.filter(c => c.is_dating_interest).length > 0
+                        ? comments.filter(c => c.is_dating_interest).length
+                        : 'Like'}
+                    </span>
                   </button>
 
                   <button
