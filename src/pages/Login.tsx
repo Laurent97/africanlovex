@@ -13,7 +13,7 @@ const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/dashboard';
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, userRole } = useAuth();
   const { toast } = useToast();
   
   const [email, setEmail] = useState('');
@@ -26,9 +26,10 @@ const Login = () => {
   // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
-      navigate(redirectTo, { replace: true });
+      const adminRedirect = userRole === 'admin' ? '/admin' : redirectTo;
+      navigate(adminRedirect, { replace: true });
     }
-  }, [isAuthenticated, navigate, redirectTo]);
+  }, [isAuthenticated, navigate, redirectTo, userRole]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +66,8 @@ const Login = () => {
           title: "Welcome back! 🎉",
           description: "You've been successfully signed in.",
         });
-        navigate(redirectTo, { replace: true });
+        const adminRedirect = userRole === 'admin' ? '/admin' : redirectTo;
+        navigate(adminRedirect, { replace: true });
       }
     } catch (error: unknown) {
       console.error('Login error:', error);
