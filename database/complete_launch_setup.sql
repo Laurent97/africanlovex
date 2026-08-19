@@ -1145,9 +1145,9 @@ ALTER TABLE public.admin_activity_log ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admins can view activity log" ON public.admin_activity_log;
 DROP POLICY IF EXISTS "Admins can insert activity log" ON public.admin_activity_log;
 CREATE POLICY "Admins can view activity log" ON public.admin_activity_log
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins can insert activity log" ON public.admin_activity_log
-  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR INSERT WITH CHECK (public.is_admin() = true);
 
 -- Platform settings
 CREATE TABLE IF NOT EXISTS public.platform_settings (
@@ -1160,7 +1160,7 @@ CREATE TABLE IF NOT EXISTS public.platform_settings (
 ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Admins can manage settings" ON public.platform_settings;
 CREATE POLICY "Admins can manage settings" ON public.platform_settings
-  FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR ALL USING (public.is_admin() = true);
 
 -- Admin helper functions
 CREATE OR REPLACE FUNCTION public.get_admin_stats()
@@ -1203,72 +1203,87 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Admin helper to avoid infinite recursion in RLS
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT COALESCE((
+    SELECT is_admin FROM public.profiles
+    WHERE id = auth.uid()
+  ), false);
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, anon;
+
 -- Admin RLS policies on existing tables
 DROP POLICY IF EXISTS "Admins view all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Admins update profiles" ON public.profiles;
 CREATE POLICY "Admins view all profiles" ON public.profiles
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins update profiles" ON public.profiles
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR UPDATE USING (public.is_admin() = true);
 
 DROP POLICY IF EXISTS "Admins view all reports" ON public.profile_reports;
 DROP POLICY IF EXISTS "Admins update reports" ON public.profile_reports;
 CREATE POLICY "Admins view all reports" ON public.profile_reports
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins update reports" ON public.profile_reports
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR UPDATE USING (public.is_admin() = true);
 
 DROP POLICY IF EXISTS "Admins view verifications" ON public.verification_attempts;
 DROP POLICY IF EXISTS "Admins update verifications" ON public.verification_attempts;
 CREATE POLICY "Admins view verifications" ON public.verification_attempts
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins update verifications" ON public.verification_attempts
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR UPDATE USING (public.is_admin() = true);
 
 DROP POLICY IF EXISTS "Admins view all rooms" ON public.live_rooms;
 DROP POLICY IF EXISTS "Admins update rooms" ON public.live_rooms;
 CREATE POLICY "Admins view all rooms" ON public.live_rooms
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins update rooms" ON public.live_rooms
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR UPDATE USING (public.is_admin() = true);
 
 DROP POLICY IF EXISTS "Admins view payments" ON public.payment_transactions;
 DROP POLICY IF EXISTS "Admins update payments" ON public.payment_transactions;
 CREATE POLICY "Admins view payments" ON public.payment_transactions
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins update payments" ON public.payment_transactions
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR UPDATE USING (public.is_admin() = true);
 
 DROP POLICY IF EXISTS "Admins view withdrawals" ON public.withdrawal_requests;
 DROP POLICY IF EXISTS "Admins update withdrawals" ON public.withdrawal_requests;
 CREATE POLICY "Admins view withdrawals" ON public.withdrawal_requests
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins update withdrawals" ON public.withdrawal_requests
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR UPDATE USING (public.is_admin() = true);
 
 DROP POLICY IF EXISTS "Admins view all messages" ON public.messages;
 DROP POLICY IF EXISTS "Admins delete messages" ON public.messages;
 CREATE POLICY "Admins view all messages" ON public.messages
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins delete messages" ON public.messages
-  FOR DELETE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR DELETE USING (public.is_admin() = true);
 
 DROP POLICY IF EXISTS "Admins view all room participants" ON public.room_participants;
 DROP POLICY IF EXISTS "Admins update room participants" ON public.room_participants;
 DROP POLICY IF EXISTS "Admins delete room participants" ON public.room_participants;
 CREATE POLICY "Admins view all room participants" ON public.room_participants
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins update room participants" ON public.room_participants
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR UPDATE USING (public.is_admin() = true);
 CREATE POLICY "Admins delete room participants" ON public.room_participants
-  FOR DELETE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR DELETE USING (public.is_admin() = true);
 
 DROP POLICY IF EXISTS "Admins view room reports" ON public.room_reports;
 DROP POLICY IF EXISTS "Admins update room reports" ON public.room_reports;
 CREATE POLICY "Admins view room reports" ON public.room_reports
-  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR SELECT USING (public.is_admin() = true);
 CREATE POLICY "Admins update room reports" ON public.room_reports
-  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+  FOR UPDATE USING (public.is_admin() = true);
 
 -- ============================================================================
 -- DONE! Verify with:
