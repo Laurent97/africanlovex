@@ -1010,13 +1010,13 @@ const Chat = () => {
                 <Button variant="ghost" size="sm" disabled={uploadingImage} className="touch-target">
                   <Camera className="w-5 h-5" />
                 </Button>
-                <Popover open={showStickerPopover} onOpenChange={setShowStickerPopover}>
+                <Popover open={showStickerPopover}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="sm" disabled={uploadingImage} onClick={() => setShowStickerPopover(p => !p)} className="touch-target">
                       <ImageIcon className="w-5 h-5" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="top" align="start" className="w-64 p-2">
+                  <PopoverContent side="top" align="start" className="w-64 p-2" onPointerDownOutside={() => setShowStickerPopover(false)} onFocusOutside={() => setShowStickerPopover(false)}>
                     <div className="grid grid-cols-4 gap-2">
                       {stickerUrls.map((url, i) => (
                         <button
@@ -1332,13 +1332,13 @@ const Chat = () => {
                   <Button variant="ghost" size="sm" disabled={uploadingImage}>
                     <Camera className="w-4 h-4" />
                   </Button>
-                  <Popover open={showStickerPopover} onOpenChange={setShowStickerPopover}>
+                  <Popover open={showStickerPopover}>
                     <PopoverTrigger asChild>
                       <Button variant="ghost" size="sm" disabled={uploadingImage} onClick={() => setShowStickerPopover(p => !p)}>
                         <ImageIcon className="w-4 h-4" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent side="top" align="start" className="w-64 p-2">
+                    <PopoverContent side="top" align="start" className="w-64 p-2" onPointerDownOutside={() => setShowStickerPopover(false)} onFocusOutside={() => setShowStickerPopover(false)}>
                       <div className="grid grid-cols-4 gap-2">
                         {stickerUrls.map((url, i) => (
                           <button

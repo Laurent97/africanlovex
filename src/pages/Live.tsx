@@ -2847,7 +2847,7 @@ const Live = () => {
                   {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
                 </Button>
 
-                <Popover open={showStickerPicker} onOpenChange={setShowStickerPicker}>
+                <Popover open={showStickerPicker}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="ghost"
@@ -2859,7 +2859,7 @@ const Live = () => {
                       <Smile className="w-4 h-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="top" sideOffset={8} className="w-56 bg-slate-900 border-white/10 p-2">
+                  <PopoverContent side="top" sideOffset={8} className="w-56 bg-slate-900 border-white/10 p-2" onPointerDownOutside={() => setShowStickerPicker(false)} onFocusOutside={() => setShowStickerPicker(false)}>
                     <div className="grid grid-cols-4 gap-2">
                       {STICKERS.map((sticker) => (
                         <button
@@ -2875,18 +2875,19 @@ const Live = () => {
                   </PopoverContent>
                 </Popover>
 
-                <Popover open={showGifPanel} onOpenChange={setShowGifPanel}>
+                <Popover open={showGifPanel}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="text-white/70 hover:text-white hover:bg-white/10 h-10 w-10 shrink-0"
+                      onClick={() => setShowGifPanel(p => !p)}
                       title="GIF"
                     >
                       <Film className="w-4 h-4" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent side="top" sideOffset={8} className="w-80 bg-slate-900 border-white/10 p-3">
+                  <PopoverContent side="top" sideOffset={8} className="w-80 bg-slate-900 border-white/10 p-3" onPointerDownOutside={() => setShowGifPanel(false)} onFocusOutside={() => setShowGifPanel(false)}>
                     {import.meta.env.VITE_GIPHY_API_KEY ? (
                       <div className="space-y-2">
                         <div className="flex gap-2">
@@ -3059,18 +3060,19 @@ const Live = () => {
                       {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
                     </Button>
 
-                    <Popover open={showStickerPicker} onOpenChange={setShowStickerPicker}>
+                    <Popover open={showStickerPicker}>
                       <PopoverTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="text-white/70 hover:text-white hover:bg-white/10 h-9 w-9 shrink-0"
+                          onClick={() => setShowStickerPicker(p => !p)}
                           title="Stickers"
                         >
                           <Smile className="w-4 h-4" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent side="top" sideOffset={8} className="w-56 bg-slate-900 border-white/10 p-2">
+                      <PopoverContent side="top" sideOffset={8} className="w-56 bg-slate-900 border-white/10 p-2" onPointerDownOutside={() => setShowStickerPicker(false)} onFocusOutside={() => setShowStickerPicker(false)}>
                         <div className="grid grid-cols-4 gap-2">
                           {STICKERS.map((sticker) => (
                             <button
@@ -3086,18 +3088,19 @@ const Live = () => {
                       </PopoverContent>
                     </Popover>
 
-                    <Popover open={showGifPanel} onOpenChange={setShowGifPanel}>
+                    <Popover open={showGifPanel}>
                       <PopoverTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="text-white/70 hover:text-white hover:bg-white/10 h-9 w-9 shrink-0"
+                          onClick={() => setShowGifPanel(p => !p)}
                           title="GIF"
                         >
                           <Film className="w-4 h-4" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent side="top" sideOffset={8} className="w-72 bg-slate-900 border-white/10 p-3">
+                      <PopoverContent side="top" sideOffset={8} className="w-72 bg-slate-900 border-white/10 p-3" onPointerDownOutside={() => setShowGifPanel(false)} onFocusOutside={() => setShowGifPanel(false)}>
                         {import.meta.env.VITE_GIPHY_API_KEY ? (
                           <div className="space-y-2">
                             <div className="flex gap-2">
