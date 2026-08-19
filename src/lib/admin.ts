@@ -144,3 +144,193 @@ export async function logAdminAction(
     console.error('Failed to log admin action:', error);
   }
 }
+
+export interface AdminReport {
+  id: string;
+  reporter_id: string;
+  reported_user_id: string;
+  reason: string;
+  category: string;
+  description: string;
+  evidence: string[] | null;
+  status: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+  created_at: string;
+  updated_at: string;
+  reporter_profile?: { username?: string | null; full_name?: string | null; avatar_url?: string | null } | null;
+  reported_profile?: { username?: string | null; full_name?: string | null; avatar_url?: string | null; country?: string | null } | null;
+}
+
+export interface GetReportsParams {
+  status?: 'all' | 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetReportsResult {
+  data: AdminReport[];
+  count: number;
+}
+
+export async function getReports(params: GetReportsParams = {}): Promise<GetReportsResult> {
+  const { status = 'all', page = 1, perPage = 10 } = params;
+
+  let query = (supabase as any)
+    .from('profile_reports')
+    .select(
+      `*,
+      reporter_profile:profiles!profile_reports_reporter_id_fkey(username, full_name, avatar_url),
+      reported_profile:profiles!profile_reports_reported_user_id_fkey(username, full_name, avatar_url, country)`,
+      { count: 'exact' }
+    )
+    .order('created_at', { ascending: false });
+
+  if (status !== 'all') {
+    query = query.eq('status', status);
+  }
+
+  const start = (page - 1) * perPage;
+  const { data, error, count } = await query.range(start, start + perPage - 1);
+
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as AdminReport[],
+    count: count ?? 0,
+  };
+}
+
+export async function getReportDetails(id: string): Promise<AdminReport> {
+  const { data, error } = await (supabase as any)
+    .from('profile_reports')
+    .select(
+      `*,
+      reporter_profile:profiles!profile_reports_reporter_id_fkey(*),
+      reported_profile:profiles!profile_reports_reported_user_id_fkey(*)`
+    )
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error('Report not found');
+  return data as AdminReport;
+}
+
+export async function updateReportStatus(
+  id: string,
+  status: 'resolved' | 'dismissed',
+  notes?: string
+): Promise<void> {
+  const { error } = await (supabase as any)
+    .from('profile_reports')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id);
+
+  if (error) throw error;
+
+  await logAdminAction('Update report status', 'report', id, { status, notes });
+}
+
+export interface VerificationAttempt {
+  id: string;
+  user_id: string;
+  attempt_number: number;
+  status: 'pending' | 'approved' | 'rejected';
+  selfie_urls: string[] | null;
+  pose_types: string[] | null;
+  confidence_scores: number[] | null;
+  rejection_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+  profile?: { username?: string | null; full_name?: string | null; avatar_url?: string | null } | null;
+}
+
+export interface GetVerificationAttemptsParams {
+  status?: 'all' | 'pending' | 'approved' | 'rejected';
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetVerificationAttemptsResult {
+  data: VerificationAttempt[];
+  count: number;
+}
+
+export async function getVerificationAttempts(
+  params: GetVerificationAttemptsParams = {}
+): Promise<GetVerificationAttemptsResult> {
+  const { status = 'all', page = 1, perPage = 10 } = params;
+
+  let query = (supabase as any)
+    .from('verification_attempts')
+    .select(
+      `*,
+      profile:profiles!verification_attempts_user_id_fkey(username, full_name, avatar_url)`,
+      { count: 'exact' }
+    )
+    .order('created_at', { ascending: false });
+
+  if (status !== 'all') {
+    query = query.eq('status', status);
+  }
+
+  const start = (page - 1) * perPage;
+  const { data, error, count } = await query.range(start, start + perPage - 1);
+
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as VerificationAttempt[],
+    count: count ?? 0,
+  };
+}
+
+export async function approveVerification(id: string): Promise<void> {
+  const { data: attempt, error: fetchError } = await (supabase as any)
+    .from('verification_attempts')
+    .select('user_id')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) throw fetchError;
+  if (!attempt?.user_id) throw new Error('Verification attempt not found');
+
+  const now = new Date().toISOString();
+
+  const { error: updateError } = await (supabase as any)
+    .from('verification_attempts')
+    .update({ status: 'approved', completed_at: now })
+    .eq('id', id);
+
+  if (updateError) throw updateError;
+
+  const { error: profileError } = await (supabase as any)
+    .from('profiles')
+    .update({ is_verified: true, verification_level: 'basic', updated_at: now })
+    .eq('id', attempt.user_id);
+
+  if (profileError) throw profileError;
+
+  await logAdminAction('Approve verification', 'verification', id, { user_id: attempt.user_id });
+}
+
+export async function rejectVerification(id: string, reason: string): Promise<void> {
+  const { data: attempt, error: fetchError } = await (supabase as any)
+    .from('verification_attempts')
+    .select('user_id')
+    .eq('id', id)
+    .single();
+
+  if (fetchError) throw fetchError;
+  if (!attempt?.user_id) throw new Error('Verification attempt not found');
+
+  const now = new Date().toISOString();
+
+  const { error } = await (supabase as any)
+    .from('verification_attempts')
+    .update({ status: 'rejected', rejection_reason: reason, completed_at: now })
+    .eq('id', id);
+
+  if (error) throw error;
+
+  await logAdminAction('Reject verification', 'verification', id, { user_id: attempt.user_id, reason });
+}
