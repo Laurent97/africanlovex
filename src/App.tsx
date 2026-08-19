@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { Suspense, lazy } from 'react';
 import { Loader2 } from 'lucide-react';
 
@@ -40,6 +40,9 @@ const SimpleSignupFlow = lazy(() => import('./pages/auth/SimpleSignupFlow'));
 const Login = lazy(() => import('./pages/Login'));
 const SystemBrowser = lazy(() => import('./pages/SystemBrowser'));
 const NotFound = lazy(() => import('./pages/NotFound'));
+const AdminDashboard = lazy(() => import('./pages/admin'));
+const AdminUsers = lazy(() => import('./pages/admin/users'));
+const AdminPlaceholder = lazy(() => import('./components/admin/AdminPlaceholder'));
 
 // Loading component for lazy loading
 const LoadingSpinner = () => (
@@ -353,17 +356,31 @@ const App = () => (
           </Route>
 
           {/* Admin Routes */}
-          <Route element={<AuthLayout />}>
+          <Route element={<ProtectedRoute requiredRole="admin"><Outlet /></ProtectedRoute>}>
             <Route 
               path="/admin" 
               element={
-                <ProtectedRoute requiredRole="admin">
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <div>Admin Dashboard</div>
-                  </Suspense>
-                </ProtectedRoute>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <AdminDashboard />
+                </Suspense>
               } 
             />
+            <Route 
+              path="/admin/users" 
+              element={
+                <Suspense fallback={<LoadingSpinner />}>
+                  <AdminUsers />
+                </Suspense>
+              } 
+            />
+            <Route path="/admin/verification" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
+            <Route path="/admin/reports" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
+            <Route path="/admin/live" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
+            <Route path="/admin/gifts" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
+            <Route path="/admin/payments" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
+            <Route path="/admin/content" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
+            <Route path="/admin/analytics" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
+            <Route path="/admin/settings" element={<Suspense fallback={<LoadingSpinner />}><AdminPlaceholder /></Suspense>} />
           </Route>
 
           {/* Payment Callback (Public but needs special handling) */}

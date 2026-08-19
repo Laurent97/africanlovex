@@ -1120,6 +1120,137 @@ BEGIN
 END $$;
 
 -- ============================================================================
+-- ADMIN DASHBOARD SUPPORT
+-- ============================================================================
+
+-- Admin flag on profiles
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT false,
+  ADD COLUMN IF NOT EXISTS suspension_ends_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
+
+-- Admin activity log
+CREATE TABLE IF NOT EXISTS public.admin_activity_log (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  admin_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id UUID,
+  details JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.admin_activity_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins can view activity log" ON public.admin_activity_log;
+DROP POLICY IF EXISTS "Admins can insert activity log" ON public.admin_activity_log;
+CREATE POLICY "Admins can view activity log" ON public.admin_activity_log
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins can insert activity log" ON public.admin_activity_log
+  FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+-- Platform settings
+CREATE TABLE IF NOT EXISTS public.platform_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_by UUID REFERENCES public.profiles(id),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Admins can manage settings" ON public.platform_settings;
+CREATE POLICY "Admins can manage settings" ON public.platform_settings
+  FOR ALL USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+-- Admin helper functions
+CREATE OR REPLACE FUNCTION public.get_admin_stats()
+RETURNS JSONB AS $$
+DECLARE stats JSONB;
+BEGIN
+  SELECT jsonb_build_object(
+    'total_users', (SELECT COUNT(*) FROM public.profiles),
+    'verified_users', (SELECT COUNT(*) FROM public.profiles WHERE is_verified = true),
+    'premium_users', (SELECT COUNT(*) FROM public.profiles WHERE vip_tier != 'free'),
+    'suspended_users', (SELECT COUNT(*) FROM public.profiles WHERE is_suspended = true),
+    'pending_reports', (SELECT COUNT(*) FROM public.profile_reports WHERE status = 'pending'),
+    'pending_verifications', (SELECT COUNT(*) FROM public.verification_attempts WHERE status = 'pending'),
+    'active_streams', (SELECT COUNT(*) FROM public.live_rooms WHERE is_active = true),
+    'pending_withdrawals', (SELECT COUNT(*) FROM public.withdrawal_requests WHERE status = 'pending')
+  ) INTO stats;
+  RETURN stats;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.suspend_user(user_uuid UUID, duration_days INTEGER, reason TEXT)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE public.profiles
+  SET is_suspended = true,
+      suspension_ends_at = CASE WHEN duration_days > 0 THEN NOW() + (duration_days || ' days')::INTERVAL ELSE NULL END,
+      suspension_reason = reason
+  WHERE id = user_uuid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.unsuspend_user(user_uuid UUID)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE public.profiles
+  SET is_suspended = false,
+      suspension_ends_at = NULL,
+      suspension_reason = NULL
+  WHERE id = user_uuid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Admin RLS policies on existing tables
+DROP POLICY IF EXISTS "Admins view all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Admins update profiles" ON public.profiles;
+CREATE POLICY "Admins view all profiles" ON public.profiles
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins update profiles" ON public.profiles
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+DROP POLICY IF EXISTS "Admins view all reports" ON public.profile_reports;
+DROP POLICY IF EXISTS "Admins update reports" ON public.profile_reports;
+CREATE POLICY "Admins view all reports" ON public.profile_reports
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins update reports" ON public.profile_reports
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+DROP POLICY IF EXISTS "Admins view verifications" ON public.verification_attempts;
+DROP POLICY IF EXISTS "Admins update verifications" ON public.verification_attempts;
+CREATE POLICY "Admins view verifications" ON public.verification_attempts
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins update verifications" ON public.verification_attempts
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+DROP POLICY IF EXISTS "Admins view all rooms" ON public.live_rooms;
+DROP POLICY IF EXISTS "Admins update rooms" ON public.live_rooms;
+CREATE POLICY "Admins view all rooms" ON public.live_rooms
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins update rooms" ON public.live_rooms
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+DROP POLICY IF EXISTS "Admins view payments" ON public.payment_transactions;
+DROP POLICY IF EXISTS "Admins update payments" ON public.payment_transactions;
+CREATE POLICY "Admins view payments" ON public.payment_transactions
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins update payments" ON public.payment_transactions
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+DROP POLICY IF EXISTS "Admins view withdrawals" ON public.withdrawal_requests;
+DROP POLICY IF EXISTS "Admins update withdrawals" ON public.withdrawal_requests;
+CREATE POLICY "Admins view withdrawals" ON public.withdrawal_requests
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+CREATE POLICY "Admins update withdrawals" ON public.withdrawal_requests
+  FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+DROP POLICY IF EXISTS "Admins view all messages" ON public.messages;
+CREATE POLICY "Admins view all messages" ON public.messages
+  FOR SELECT USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_admin = true));
+
+-- ============================================================================
 -- DONE! Verify with:
 -- SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY 1;
 -- ============================================================================
