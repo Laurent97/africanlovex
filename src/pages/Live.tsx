@@ -347,6 +347,9 @@ const Live = () => {
   const [newStreamNotification, setNewStreamNotification] = useState<LiveStream | null>(null);
   const [replyToComment, setReplyToComment] = useState<LiveComment | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [bannedWords, setBannedWords] = useState<string[]>(['spam', 'scam']);
+  const [newBannedWord, setNewBannedWord] = useState('');
+  const [showModeration, setShowModeration] = useState(false);
   const [selectedParticipant, setSelectedParticipant] = useState<RoomParticipant | null>(null);
   
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -1524,6 +1527,19 @@ const Live = () => {
     }
   };
 
+  const handleAddBannedWord = () => {
+    if (!newBannedWord.trim()) return;
+    const word = newBannedWord.trim().toLowerCase();
+    if (!bannedWords.includes(word)) {
+      setBannedWords([...bannedWords, word]);
+    }
+    setNewBannedWord('');
+  };
+
+  const handleRemoveBannedWord = (word: string) => {
+    setBannedWords(bannedWords.filter(w => w !== word));
+  };
+
   const handleShare = () => {
     const streamUrl = `${window.location.origin}/live?stream=${selectedStream?.id}`;
     if (navigator.share) {
@@ -1621,9 +1637,63 @@ const Live = () => {
 
   // Live Stream Player View (Mobile-First)
   if (selectedStream) {
+    const lowerMessage = (msg: string) => msg?.toLowerCase() || '';
+    const visibleComments = comments.filter(
+      c => !bannedWords.some(w => lowerMessage(c.message).includes(w.toLowerCase()))
+    );
+
     return (
       <AuthGuard>
         <div className="h-screen w-full bg-black relative overflow-hidden flex flex-col lg:flex-row">
+          {/* Moderation Panel */}
+          <AnimatePresence>
+            {showModeration && isHost && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="absolute top-16 right-3 z-40 w-72 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    Chat Filters
+                  </h3>
+                  <button onClick={() => setShowModeration(false)} className="text-white/50 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 mb-3 max-h-24 overflow-y-auto">
+                  {bannedWords.map(word => (
+                    <span
+                      key={word}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-rose-500/20 text-rose-200 text-[10px] border border-rose-500/30"
+                    >
+                      {word}
+                      <button onClick={() => handleRemoveBannedWord(word)} className="hover:text-white">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    value={newBannedWord}
+                    onChange={(e) => setNewBannedWord(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddBannedWord()}
+                    placeholder="Add word..."
+                    className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-xs h-9"
+                  />
+                  <Button onClick={handleAddBannedWord} size="sm" className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Add
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Video Container */}
           <div
             ref={videoContainerRef}
@@ -1852,12 +1922,21 @@ const Live = () => {
 
                 <div className="flex items-center gap-2">
                   {isHost && (
-                    <Button
-                      onClick={handleStopLive}
-                      className="h-11 px-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-lg shadow-rose-600/30"
-                    >
-                      End Stream
-                    </Button>
+                    <>
+                      <Button
+                        onClick={() => setShowModeration(!showModeration)}
+                        className="h-11 px-5 rounded-full bg-slate-700 hover:bg-slate-600 text-white font-semibold text-sm shadow-lg"
+                      >
+                        <Shield className="w-4 h-4 mr-1.5" />
+                        Moderation
+                      </Button>
+                      <Button
+                        onClick={handleStopLive}
+                        className="h-11 px-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-lg shadow-rose-600/30"
+                      >
+                        End Stream
+                      </Button>
+                    </>
                   )}
                   {!isHost && (
                     <>
@@ -1875,7 +1954,7 @@ const Live = () => {
                         className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium lg:hidden"
                       >
                         <MessageCircle className="w-4 h-4 mr-1.5" />
-                        {comments.length} Chat
+                        {visibleComments.length} Chat
                       </Button>
                     </>
                   )}
@@ -1901,7 +1980,7 @@ const Live = () => {
               ref={chatContainerRef}
               className="flex-1 overflow-y-auto p-4 space-y-3"
             >
-              {comments.map((comment) => (
+              {visibleComments.map((comment) => (
                 <div key={comment.id} className="flex items-start gap-2.5">
                   <Avatar className="w-7 h-7 flex-shrink-0">
                     <AvatarImage src={comment.user_avatar} />
@@ -1991,7 +2070,7 @@ const Live = () => {
                   ref={chatContainerRef}
                   className="flex-1 overflow-y-auto p-3 space-y-3"
                 >
-                  {comments.map((comment) => (
+                  {visibleComments.map((comment) => (
                     <div key={comment.id} className="flex items-start gap-2">
                       <Avatar className="w-6 h-6 flex-shrink-0">
                         <AvatarImage src={comment.user_avatar} />
