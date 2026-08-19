@@ -8,7 +8,8 @@ import {
   Send, Maximize2, Minimize2, Settings, ThumbsUp, Flame,
   Zap, Globe, MapPin, Clock, AlertCircle, Shield, ChevronDown,
   ChevronUp, Move, Pin, PinOff, Loader2, User, UserPlus, Menu, Lock,
-  Wifi, WifiOff, Volume2, VolumeX, Download, Award, Gem, BarChart3, Plus
+  Wifi, WifiOff, Volume2, VolumeX, Download, Award, Gem, BarChart3, Plus,
+  Image, Smile, Film
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
@@ -68,6 +71,8 @@ interface LiveComment {
   is_highlighted?: boolean;
   is_system?: boolean;
   is_dating_interest?: boolean;
+  is_image?: boolean;
+  message_type?: string;
 }
 
 interface RoomParticipant {
@@ -501,6 +506,16 @@ const Live = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [comments, setComments] = useState<LiveComment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [showGifPanel, setShowGifPanel] = useState(false);
+  const [gifQuery, setGifQuery] = useState('');
+  const [gifResults, setGifResults] = useState<{ id: string; url: string; preview: string }[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
+  const [tagQuery, setTagQuery] = useState('');
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [showGoLive, setShowGoLive] = useState(false);
@@ -559,6 +574,21 @@ const Live = () => {
     "Where's the best place for a first date?",
     "What's your biggest dating pet peeve?",
     "How do you know when you like someone?"
+  ];
+
+  const STICKERS = [
+    { id: 'heart', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/2764.svg', label: '❤️' },
+    { id: 'joy', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f602.svg', label: '😂' },
+    { id: 'fire', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f525.svg', label: '🔥' },
+    { id: 'thumbsup', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f44d.svg', label: '👍' },
+    { id: 'party', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f389.svg', label: '🎉' },
+    { id: 'heart-eyes', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f60d.svg', label: '😍' },
+    { id: 'sunglasses', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f60e.svg', label: '😎' },
+    { id: 'two-hearts', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f495.svg', label: '💕' },
+    { id: 'sparkles', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/2728.svg', label: '✨' },
+    { id: 'rose', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f339.svg', label: '🌹' },
+    { id: 'partying', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f973.svg', label: '🥳' },
+    { id: 'kiss', url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/svg/1f48b.svg', label: '💋' }
   ];
 
   // Load data
@@ -701,6 +731,16 @@ const Live = () => {
       commentsEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [comments]);
+
+  useEffect(() => {
+    const match = newComment.match(/@(\S*)$/);
+    if (match) {
+      setTagQuery(match[1]);
+      setShowTagDropdown(true);
+    } else {
+      setShowTagDropdown(false);
+    }
+  }, [newComment]);
 
   useEffect(() => {
     if (selectedStream && !isHost) {
@@ -945,7 +985,9 @@ const Live = () => {
           message: msg.content,
           created_at: msg.created_at,
           is_gift: msg.message_type === 'gift',
-          is_dating_interest: msg.message_type === 'dating_interest'
+          is_dating_interest: msg.message_type === 'dating_interest',
+          is_image: msg.message_type === 'image',
+          message_type: msg.message_type
         });
       });
 
@@ -1132,7 +1174,9 @@ const Live = () => {
         message: message.content,
         created_at: message.created_at,
         is_gift: message.message_type === 'gift',
-        is_dating_interest: message.message_type === 'dating_interest'
+        is_dating_interest: message.message_type === 'dating_interest',
+        is_image: message.message_type === 'image',
+        message_type: message.message_type
       };
 
       setComments(prev =>
@@ -1740,6 +1784,134 @@ const Live = () => {
     }
   };
 
+  const handleSendImageMessage = async (content: string) => {
+    if (!content || !selectedStream || !user || isPractice) return;
+
+    try {
+      const { data: participant, error: participantError } = await supabase
+        .from('room_participants')
+        .select('*')
+        .eq('room_id', selectedStream.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (participantError && participantError.code !== 'PGRST116') {
+        console.error('Error checking participant status:', participantError);
+      }
+
+      if (!participant) {
+        const { error: addParticipantError } = await supabase.from('room_participants').insert({
+          room_id: selectedStream.id,
+          user_id: user.id,
+          is_host: false,
+          is_muted: false,
+          is_video_enabled: true
+        });
+
+        if (addParticipantError) {
+          toast({
+            title: 'Error',
+            description: 'Failed to join the stream. Please try refreshing.',
+            variant: 'destructive'
+          });
+          return;
+        }
+      }
+
+      const { data, error } = await supabase.from('messages').insert({
+        room_id: selectedStream.id,
+        sender_id: user.id,
+        content,
+        message_type: 'image'
+      }).select().single();
+
+      if (error) {
+        toast({
+          title: 'Error',
+          description: `Failed to send image: ${error.message}`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (data) {
+        await handleNewComment(data);
+      }
+    } catch (error) {
+      console.error('Error sending image message:', error);
+      toast({ title: 'Error', description: 'Failed to send image.', variant: 'destructive' });
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedStream || !user || isPractice) return;
+
+    try {
+      setIsUploading(true);
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('chat-images')
+        .upload(fileName, file, { upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('chat-images').getPublicUrl(fileName);
+      const publicUrl = data.publicUrl;
+
+      await handleSendImageMessage(publicUrl);
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({ title: 'Upload Failed', description: 'Could not upload image.', variant: 'destructive' });
+      setIsUploading(false);
+    }
+  };
+
+  const handleSelectSticker = async (url: string) => {
+    await handleSendImageMessage(url);
+    setShowStickerPicker(false);
+  };
+
+  const handleGiphySearch = async () => {
+    const apiKey = import.meta.env.VITE_GIPHY_API_KEY;
+    if (!apiKey || !gifQuery.trim()) return;
+
+    setGifLoading(true);
+    try {
+      const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(gifQuery)}&limit=12&rating=g`);
+      const json = await res.json();
+      setGifResults((json.data || []).map((g: any) => ({
+        id: g.id,
+        url: g.images?.original?.url || g.images?.fixed_height?.url,
+        preview: g.images?.fixed_height_downsampled?.url || g.images?.fixed_height?.url
+      })));
+    } catch (error) {
+      console.error('Error searching Giphy:', error);
+    } finally {
+      setGifLoading(false);
+    }
+  };
+
+  const handleSelectGif = async (url: string) => {
+    await handleSendImageMessage(url);
+    setShowGifPanel(false);
+    setGifQuery('');
+    setGifResults([]);
+  };
+
+  const handleInsertMention = (username: string) => {
+    const mention = `@${username} `;
+    const replaced = newComment.replace(/@[\w]*$/, mention);
+    setNewComment(replaced);
+    setShowTagDropdown(false);
+    setTagQuery('');
+    chatInputRef.current?.focus();
+  };
+
   const handleSendGift = async (gift: Gift) => {
     if (!selectedStream || !user || isPractice) return;
 
@@ -2049,6 +2221,23 @@ const Live = () => {
     }
   };
 
+  const renderMentionedText = (text: string) => {
+    const parts = text.split(/(@\S+)/g);
+    return (
+      <>
+        {parts.map((part, i) =>
+          part.startsWith('@') ? (
+            <span key={i} className="text-rose-400 dark:text-purple-400 font-semibold">
+              {part}
+            </span>
+          ) : (
+            <span key={i}>{part}</span>
+          )
+        )}
+      </>
+    );
+  };
+
   const handleToggleVideo = () => {
     if (!localStream) return;
     const videoTracks = localStream.getVideoTracks();
@@ -2081,6 +2270,13 @@ const Live = () => {
     return (
       <AuthGuard>
         <div className="h-screen w-full bg-black relative overflow-hidden flex flex-col lg:flex-row">
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            onChange={handleImageUpload}
+            className="hidden"
+          />
           {/* Moderation Panel */}
           <AnimatePresence>
             {showModeration && isHost && !isPractice && (
@@ -2596,14 +2792,23 @@ const Live = () => {
                         <Crown className="w-3 h-3 text-amber-500" />
                       )}
                     </div>
-                    <p className={cn(
-                      "text-xs break-words mt-0.5",
-                      comment.is_system ? 'text-purple-400' :
-                      comment.is_gift ? 'text-amber-400' :
-                      comment.is_dating_interest ? 'text-pink-400' : 'text-white/80'
-                    )}>
-                      {comment.message}
-                    </p>
+                    {comment.is_image ? (
+                      <img
+                        src={comment.message}
+                        alt="shared"
+                        className="max-h-40 rounded-lg mt-1 object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <p className={cn(
+                        "text-xs break-words mt-0.5",
+                        comment.is_system ? 'text-purple-400' :
+                        comment.is_gift ? 'text-amber-400' :
+                        comment.is_dating_interest ? 'text-pink-400' : 'text-white/80'
+                      )}>
+                        {renderMentionedText(comment.message)}
+                      </p>
+                    )}
                   </div>
                   <span className="text-white/30 text-[10px] flex-shrink-0">{formatTime(comment.created_at)}</span>
                 </div>
@@ -2622,18 +2827,121 @@ const Live = () => {
                   </Button>
                 </div>
               )}
-              <div className="flex gap-2">
-                <Input
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
-                  placeholder="Say something nice..."
-                  className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-11"
-                />
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => fileInputRef.current?.click()}
+                  variant="ghost"
+                  size="icon"
+                  disabled={isUploading}
+                  className="text-white/70 hover:text-white hover:bg-white/10 h-10 w-10 shrink-0"
+                  title="Upload image"
+                >
+                  {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
+                </Button>
+
+                <Popover open={showStickerPicker} onOpenChange={setShowStickerPicker}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-white/70 hover:text-white hover:bg-white/10 h-10 w-10 shrink-0"
+                      title="Stickers"
+                    >
+                      <Smile className="w-4 h-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent side="top" sideOffset={8} className="w-56 bg-slate-900 border-white/10 p-2">
+                    <div className="grid grid-cols-4 gap-2">
+                      {STICKERS.map((sticker) => (
+                        <button
+                          key={sticker.id}
+                          onClick={() => handleSelectSticker(sticker.url)}
+                          className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
+                          title={sticker.label}
+                        >
+                          <img src={sticker.url} alt={sticker.label} className="w-7 h-7" />
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                <Popover open={showGifPanel} onOpenChange={setShowGifPanel}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-white/70 hover:text-white hover:bg-white/10 h-10 w-10 shrink-0"
+                      title="GIF"
+                    >
+                      <Film className="w-4 h-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent side="top" sideOffset={8} className="w-80 bg-slate-900 border-white/10 p-3">
+                    {import.meta.env.VITE_GIPHY_API_KEY ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={gifQuery}
+                            onChange={(e) => setGifQuery(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleGiphySearch()}
+                            placeholder="Search GIFs..."
+                            className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-9"
+                          />
+                          <Button onClick={handleGiphySearch} size="sm" className="h-9 px-3 bg-rose-600 text-white">
+                            {gifLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Search'}
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                          {gifResults.map((gif) => (
+                            <button
+                              key={gif.id}
+                              onClick={() => handleSelectGif(gif.url)}
+                              className="relative aspect-square rounded-lg overflow-hidden hover:ring-2 ring-rose-500"
+                            >
+                              <img src={gif.preview} alt="gif" className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-white/70 text-center py-4">
+                        Add VITE_GIPHY_API_KEY to .env to enable GIF search.
+                      </p>
+                    )}
+                  </PopoverContent>
+                </Popover>
+
+                <div className="flex-1 relative">
+                  <Input
+                    ref={chatInputRef}
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
+                    placeholder="Say something nice..."
+                    className="w-full bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-11"
+                  />
+                  {showTagDropdown && (
+                    <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-900 border border-white/10 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                      {participants
+                        .filter((p) => p.user_name.toLowerCase().includes(tagQuery.toLowerCase()))
+                        .map((p) => (
+                          <button
+                            key={p.user_id}
+                            onClick={() => handleInsertMention(p.user_name)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-white/90 hover:bg-white/10"
+                          >
+                            <Avatar className="w-6 h-6"><AvatarImage src={p.user_avatar} /><AvatarFallback className="text-[10px]">{p.user_name[0]}</AvatarFallback></Avatar>
+                            <span>@{p.user_name}</span>
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                </div>
                 <Button
                   onClick={handleSendComment}
                   size="icon"
-                  className="bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white h-11 w-11 p-0 rounded-xl"
+                  className="bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white h-11 w-11 p-0 rounded-xl shrink-0"
                 >
                   <Send className="w-4 h-4" />
                 </Button>
@@ -2696,14 +3004,23 @@ const Live = () => {
                           )}
                           <span className="text-white/40 text-xs">{formatTime(comment.created_at)}</span>
                         </div>
-                        <p className={cn(
-                          "text-sm break-words",
-                          comment.is_system ? 'text-purple-400' : 
-                          comment.is_gift ? 'text-amber-400' : 
-                          comment.is_dating_interest ? 'text-pink-400' : 'text-white/90'
-                        )}>
-                          {comment.message}
-                        </p>
+                        {comment.is_image ? (
+                          <img
+                            src={comment.message}
+                            alt="shared"
+                            className="max-h-40 rounded-lg mt-1 object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <p className={cn(
+                            "text-sm break-words",
+                            comment.is_system ? 'text-purple-400' : 
+                            comment.is_gift ? 'text-amber-400' : 
+                            comment.is_dating_interest ? 'text-pink-400' : 'text-white/90'
+                          )}>
+                            {renderMentionedText(comment.message)}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -2721,18 +3038,121 @@ const Live = () => {
                       </Button>
                     </div>
                   )}
-                  <div className="flex gap-2">
-                    <Input
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
-                      placeholder="Type a message..."
-                      className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-10"
-                    />
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      onClick={() => fileInputRef.current?.click()}
+                      variant="ghost"
+                      size="icon"
+                      disabled={isUploading}
+                      className="text-white/70 hover:text-white hover:bg-white/10 h-9 w-9 shrink-0"
+                      title="Upload image"
+                    >
+                      {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
+                    </Button>
+
+                    <Popover open={showStickerPicker} onOpenChange={setShowStickerPicker}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-white/70 hover:text-white hover:bg-white/10 h-9 w-9 shrink-0"
+                          title="Stickers"
+                        >
+                          <Smile className="w-4 h-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent side="top" sideOffset={8} className="w-56 bg-slate-900 border-white/10 p-2">
+                        <div className="grid grid-cols-4 gap-2">
+                          {STICKERS.map((sticker) => (
+                            <button
+                              key={sticker.id}
+                              onClick={() => handleSelectSticker(sticker.url)}
+                              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
+                              title={sticker.label}
+                            >
+                              <img src={sticker.url} alt={sticker.label} className="w-7 h-7" />
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    <Popover open={showGifPanel} onOpenChange={setShowGifPanel}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-white/70 hover:text-white hover:bg-white/10 h-9 w-9 shrink-0"
+                          title="GIF"
+                        >
+                          <Film className="w-4 h-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent side="top" sideOffset={8} className="w-72 bg-slate-900 border-white/10 p-3">
+                        {import.meta.env.VITE_GIPHY_API_KEY ? (
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
+                              <Input
+                                value={gifQuery}
+                                onChange={(e) => setGifQuery(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleGiphySearch()}
+                                placeholder="Search GIFs..."
+                                className="flex-1 bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-9"
+                              />
+                              <Button onClick={handleGiphySearch} size="sm" className="h-9 px-2 bg-rose-600 text-white text-xs">
+                                {gifLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Go'}
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                              {gifResults.map((gif) => (
+                                <button
+                                  key={gif.id}
+                                  onClick={() => handleSelectGif(gif.url)}
+                                  className="relative aspect-square rounded-lg overflow-hidden hover:ring-2 ring-rose-500"
+                                >
+                                  <img src={gif.preview} alt="gif" className="w-full h-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-white/70 text-center py-4">
+                            Add VITE_GIPHY_API_KEY to .env to enable GIF search.
+                          </p>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+
+                    <div className="flex-1 relative min-w-0">
+                      <Input
+                        ref={chatInputRef}
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
+                        placeholder="Type a message..."
+                        className="w-full bg-white/10 text-white placeholder-white/40 border-white/10 text-sm h-10"
+                      />
+                      {showTagDropdown && (
+                        <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-900 border border-white/10 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                          {participants
+                            .filter((p) => p.user_name.toLowerCase().includes(tagQuery.toLowerCase()))
+                            .map((p) => (
+                              <button
+                                key={p.user_id}
+                                onClick={() => handleInsertMention(p.user_name)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-white/90 hover:bg-white/10"
+                              >
+                                <Avatar className="w-6 h-6"><AvatarImage src={p.user_avatar} /><AvatarFallback className="text-[10px]">{p.user_name[0]}</AvatarFallback></Avatar>
+                                <span>@{p.user_name}</span>
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                     <Button
                       onClick={handleSendComment}
                       size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 text-white h-10 w-10 p-0"
+                      className="bg-purple-600 hover:bg-purple-700 text-white h-10 w-10 p-0 shrink-0"
                     >
                       <Send className="w-4 h-4" />
                     </Button>

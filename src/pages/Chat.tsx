@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -29,7 +29,8 @@ import {
   Info,
   X,
   Plus,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -37,10 +38,13 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { BottomSheet } from '@/components/ui/BottomSheet';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useKeyboard } from '@/hooks/useKeyboard';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 import VerificationBadge from '@/components/verification/VerificationBadge';
+import GiftSender from '@/components/gifts/GiftSender';
 
 interface Message {
   id: string;
@@ -108,10 +112,19 @@ const Chat = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mentionInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Record<string, Message[]>>({});
+  const [showStickerPopover, setShowStickerPopover] = useState(false);
+  const [showGiphyDialog, setShowGiphyDialog] = useState(false);
+  const [giphyQuery, setGiphyQuery] = useState('');
+  const [giphyResults, setGiphyResults] = useState<string[]>([]);
+  const [giphyLoading, setGiphyLoading] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMention, setShowMention] = useState(false);
+  const [caretPosition, setCaretPosition] = useState(0);
 
   // Load conversations and messages
   useEffect(() => {
@@ -555,6 +568,204 @@ const Chat = () => {
     conv.location.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const giphyKey = (import.meta.env as any).VITE_GIPHY_API_KEY;
+
+  const stickerUrls = [
+    'https://picsum.photos/seed/sticker1/120/120',
+    'https://picsum.photos/seed/sticker2/120/120',
+    'https://picsum.photos/seed/sticker3/120/120',
+    'https://picsum.photos/seed/sticker4/120/120',
+    'https://picsum.photos/seed/sticker5/120/120',
+    'https://picsum.photos/seed/sticker6/120/120',
+    'https://picsum.photos/seed/sticker7/120/120',
+    'https://picsum.photos/seed/sticker8/120/120',
+    'https://picsum.photos/seed/sticker9/120/120',
+    'https://picsum.photos/seed/sticker10/120/120',
+    'https://picsum.photos/seed/sticker11/120/120',
+    'https://picsum.photos/seed/sticker12/120/120',
+  ];
+
+  const sendMediaMessage = async (content: string, messageType: 'image' | 'gift') => {
+    if (!selectedChat) return;
+    try {
+      const { data, error } = await supabase
+        .rpc('send_message', {
+          sender_uuid: user?.id,
+          receiver_uuid: selectedChat,
+          content,
+          message_type: messageType
+        });
+      if (error) throw error;
+      const newMessage: Message = {
+        id: data.id,
+        text: content,
+        sender: user?.id || '',
+        receiver: selectedChat,
+        timestamp: new Date(),
+        read: false,
+        type: messageType,
+        delivery_status: 'sent'
+      };
+      setMessages(prev => ({
+        ...prev,
+        [selectedChat]: [...(prev[selectedChat] || []), newMessage]
+      }));
+    } catch (err) {
+      console.error(`Failed to send ${messageType}:`, err);
+      setError(`Failed to send ${messageType}`);
+    }
+  };
+
+  const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const caret = e.target.selectionStart || 0;
+    setMessage(value);
+    setCaretPosition(caret);
+    handleTyping();
+
+    const startOfWord = value.lastIndexOf(' ', caret - 1) + 1;
+    const currentWord = value.slice(startOfWord, caret);
+    if (currentWord.startsWith('@')) {
+      setMentionQuery(currentWord.slice(1));
+      setShowMention(true);
+    } else {
+      setShowMention(false);
+      setMentionQuery('');
+    }
+  };
+
+  const insertMention = (username: string) => {
+    const startOfWord = message.lastIndexOf(' ', caretPosition - 1) + 1;
+    const before = message.slice(0, startOfWord);
+    const after = message.slice(caretPosition);
+    const newValue = `${before}@${username} ${after}`;
+    setMessage(newValue);
+    setShowMention(false);
+    setMentionQuery('');
+    setTimeout(() => {
+      mentionInputRef.current?.focus();
+      const pos = startOfWord + username.length + 2;
+      mentionInputRef.current?.setSelectionRange(pos, pos);
+      setCaretPosition(pos);
+    }, 0);
+  };
+
+  const handleStickerSelect = async (url: string) => {
+    setUploadingImage(true);
+    await sendMediaMessage(url, 'image');
+    setUploadingImage(false);
+    setShowStickerPopover(false);
+  };
+
+  const searchGiphy = async () => {
+    if (!giphyKey || !giphyQuery.trim()) return;
+    setGiphyLoading(true);
+    try {
+      const res = await fetch(
+        `https://api.giphy.com/v1/gifs/search?api_key=${giphyKey}&q=${encodeURIComponent(giphyQuery)}&limit=12&rating=g`
+      );
+      const json = await res.json();
+      setGiphyResults(
+        (json.data || [])
+          .map((g: any) => g.images?.fixed_height?.url || g.images?.downsized?.url)
+          .filter(Boolean)
+      );
+    } catch (err) {
+      console.error('Giphy search failed:', err);
+      setGiphyResults([]);
+    } finally {
+      setGiphyLoading(false);
+    }
+  };
+
+  const handleGiphySelect = async (url: string) => {
+    setShowGiphyDialog(false);
+    setUploadingImage(true);
+    await sendMediaMessage(url, 'image');
+    setUploadingImage(false);
+    setGiphyQuery('');
+    setGiphyResults([]);
+  };
+
+  const handleGiftSent = async (giftData: any) => {
+    const { gift } = giftData || {};
+    if (!gift) return;
+    const content = `🎁 ${gift.gift_icon || ''} ${gift.gift_name || ''}`.trim();
+    await sendMediaMessage(content, 'gift');
+  };
+
+  const participants = useMemo(() => {
+    const list: { id: string; name: string; username: string }[] = [];
+    if (user) {
+      list.push({
+        id: user.id,
+        name: 'You',
+        username: (user.email?.split('@')[0] || 'me')
+      });
+    }
+    if (selectedConversation) {
+      const username = selectedConversation.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+      list.push({
+        id: selectedConversation.participant_id,
+        name: selectedConversation.name,
+        username
+      });
+    }
+    return list;
+  }, [user, selectedConversation]);
+
+  const filteredMentions = participants.filter(p =>
+    p.username.toLowerCase().startsWith(mentionQuery.toLowerCase()) ||
+    p.name.toLowerCase().startsWith(mentionQuery.toLowerCase())
+  );
+
+  const renderMentions = (text: string, isOutgoing: boolean) => {
+    const parts = text.split(/(@\w+)/g);
+    return parts.map((part, i) => {
+      if (/^@\w+$/.test(part)) {
+        return (
+            <span
+                key={i}
+                className={`rounded px-0.5 font-medium ${
+                    isOutgoing ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-700'
+                }`}
+            >
+                {part}
+            </span>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  const renderMessageContent = (msg: Message) => {
+    const isOutgoing = msg.sender === user?.id;
+    if (msg.type === 'image') {
+      return (
+        <a href={msg.text} target="_blank" rel="noopener noreferrer">
+          <img
+            src={msg.text}
+            alt="Shared image"
+            className="max-w-full max-h-60 rounded-lg object-cover"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            loading="lazy"
+          />
+        </a>
+      );
+    }
+    if (msg.type === 'gift') {
+      return (
+        <div className="flex items-center gap-2">
+          <Gift className="w-4 h-4 shrink-0" />
+          <span className="text-sm break-words">{renderMentions(msg.text, isOutgoing)}</span>
+        </div>
+      );
+    }
+    return <p className="text-sm break-words">{renderMentions(msg.text, isOutgoing)}</p>;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -742,7 +953,7 @@ const Chat = () => {
                       ? 'bg-purple-600 text-white rounded-br-none' 
                       : 'bg-gray-100 text-gray-900 rounded-bl-none'
                   }`}>
-                    <p className="text-sm break-words">{msg.text}</p>
+                    {renderMessageContent(msg)}
                     <div className={`flex items-center gap-1 mt-1 text-xs ${
                       msg.sender === user?.id ? 'text-white/70' : 'text-gray-500'
                     }`}>
@@ -791,14 +1002,41 @@ const Chat = () => {
                 <Button variant="ghost" size="sm" disabled={uploadingImage} className="touch-target">
                   <Camera className="w-5 h-5" />
                 </Button>
+                <Popover open={showStickerPopover} onOpenChange={setShowStickerPopover}>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" disabled={uploadingImage} className="touch-target">
+                      <ImageIcon className="w-5 h-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent side="top" align="start" className="w-64 p-2">
+                    <div className="grid grid-cols-4 gap-2">
+                      {stickerUrls.map((url, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleStickerSelect(url)}
+                          className="w-14 h-14 rounded-lg overflow-hidden hover:ring-2 ring-purple-500"
+                        >
+                          <img src={url} alt="sticker" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={uploadingImage}
+                  className="touch-target text-xs font-bold px-2"
+                  onClick={() => setShowGiphyDialog(true)}
+                >
+                  GIF
+                </Button>
                 <div className="flex-1 relative">
                   <Input
+                    ref={mentionInputRef}
                     placeholder="Type a message..."
                     value={message}
-                    onChange={(e) => {
-                      setMessage(e.target.value);
-                      handleTyping();
-                    }}
+                    onChange={handleMessageChange}
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                     className="pr-10 touch-target"
                     disabled={uploadingImage}
@@ -811,6 +1049,20 @@ const Chat = () => {
                   >
                     <Smile className="w-4 h-4" />
                   </Button>
+                  {showMention && filteredMentions.length > 0 && (
+                    <div className="absolute left-0 right-0 bottom-full mb-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 max-h-40 overflow-y-auto">
+                      {filteredMentions.map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => insertMention(p.username)}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
+                        >
+                          <span className="font-medium">{p.name}</span>
+                          <span className="text-gray-500 ml-2">@{p.username}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <Button
                   onClick={handleSendMessage}
@@ -1025,7 +1277,7 @@ const Chat = () => {
                         ? 'bg-purple-600 text-white rounded-br-none' 
                         : 'bg-gray-100 text-gray-900 rounded-bl-none'
                     }`}>
-                      <p className="text-sm break-words">{msg.text}</p>
+                      {renderMessageContent(msg)}
                       <div className={`flex items-center gap-1 mt-1 text-xs ${
                         msg.sender === user?.id ? 'text-white/70' : 'text-gray-500'
                       }`}>
@@ -1072,14 +1324,41 @@ const Chat = () => {
                   <Button variant="ghost" size="sm" disabled={uploadingImage}>
                     <Camera className="w-4 h-4" />
                   </Button>
+                  <Popover open={showStickerPopover} onOpenChange={setShowStickerPopover}>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="sm" disabled={uploadingImage}>
+                        <ImageIcon className="w-4 h-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent side="top" align="start" className="w-64 p-2">
+                      <div className="grid grid-cols-4 gap-2">
+                        {stickerUrls.map((url, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleStickerSelect(url)}
+                            className="w-14 h-14 rounded-lg overflow-hidden hover:ring-2 ring-purple-500"
+                          >
+                            <img src={url} alt="sticker" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={uploadingImage}
+                    className="text-xs font-bold px-2"
+                    onClick={() => setShowGiphyDialog(true)}
+                  >
+                    GIF
+                  </Button>
                   <div className="flex-1 relative">
                     <Input
+                      ref={mentionInputRef}
                       placeholder="Type a message..."
                       value={message}
-                      onChange={(e) => {
-                        setMessage(e.target.value);
-                        handleTyping();
-                      }}
+                      onChange={handleMessageChange}
                       onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
                       className="pr-10"
                       disabled={uploadingImage}
@@ -1092,6 +1371,20 @@ const Chat = () => {
                     >
                       <Smile className="w-4 h-4" />
                     </Button>
+                    {showMention && filteredMentions.length > 0 && (
+                      <div className="absolute left-0 right-0 bottom-full mb-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 max-h-40 overflow-y-auto">
+                        {filteredMentions.map(p => (
+                          <button
+                            key={p.id}
+                            onClick={() => insertMention(p.username)}
+                            className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
+                          >
+                            <span className="font-medium">{p.name}</span>
+                            <span className="text-gray-500 ml-2">@{p.username}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <Button
                     onClick={handleSendMessage}
@@ -1156,6 +1449,76 @@ const Chat = () => {
           </div>
         </div>
       </BottomSheet>
+
+      {/* Gift Sender */}
+      {selectedConversation && (
+        <GiftSender
+          isOpen={showGiftModal}
+          onClose={() => setShowGiftModal(false)}
+          recipientId={selectedConversation.participant_id}
+          recipientName={selectedConversation.name}
+          context="chat"
+          onGiftSent={handleGiftSent}
+        />
+      )}
+
+      {/* Giphy / GIF Search */}
+      <Dialog open={showGiphyDialog} onOpenChange={setShowGiphyDialog}>
+        <DialogContent className="sm:max-w-2xl w-[calc(100%-2rem)] max-h-[85vh] p-0 gap-0 overflow-hidden rounded-2xl border-none">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <ImageIcon className="h-5 w-5 text-purple-500" />
+              GIF Search
+            </DialogTitle>
+            <DialogDescription>
+              {giphyKey ? 'Search Giphy for the perfect GIF' : 'GIF search is not enabled'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6 pt-2 overflow-y-auto max-h-[60vh]">
+            {!giphyKey ? (
+              <div className="text-center py-12">
+                <ImageIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-900 font-medium mb-2">GIFs are disabled</p>
+                <p className="text-gray-600">Add VITE_GIPHY_API_KEY to .env to enable GIF search.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <Input
+                    placeholder="Search GIFs..."
+                    value={giphyQuery}
+                    onChange={(e) => setGiphyQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && searchGiphy()}
+                  />
+                  <Button onClick={searchGiphy} disabled={giphyLoading} className="bg-gradient-to-r from-purple-600 to-pink-600">
+                    {giphyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  </Button>
+                </div>
+                {giphyLoading ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {giphyResults.map((url, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleGiphySelect(url)}
+                        className="relative rounded-lg overflow-hidden hover:ring-2 ring-purple-500 aspect-video"
+                      >
+                        <img src={url} alt="gif" className="w-full h-full object-cover" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!giphyLoading && giphyResults.length === 0 && giphyQuery.trim() && (
+                  <p className="text-center text-gray-500 py-8">No GIFs found. Try another search.</p>
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
