@@ -2853,6 +2853,7 @@ const Live = () => {
                       variant="ghost"
                       size="icon"
                       className="text-white/70 hover:text-white hover:bg-white/10 h-10 w-10 shrink-0"
+                      onClick={() => setShowStickerPicker(p => !p)}
                       title="Stickers"
                     >
                       <Smile className="w-4 h-4" />
