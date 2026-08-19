@@ -782,3 +782,145 @@ export async function getGiftExchangeRates(): Promise<AdminGiftExchangeRate[]> {
   if (error) throw error;
   return (data ?? []) as AdminGiftExchangeRate[];
 }
+
+export interface AdminActivityLogEntry {
+  id: string;
+  admin_id: string;
+  action: string;
+  target_type: string;
+  target_id?: string | null;
+  details?: Record<string, any> | null;
+  created_at: string;
+  admin?: { username?: string | null; full_name?: string | null } | null;
+}
+
+export interface GetAdminActivityLogParams {
+  page?: number;
+  perPage?: number;
+}
+
+export interface GetAdminActivityLogResult {
+  data: AdminActivityLogEntry[];
+  count: number;
+}
+
+export interface PlatformSetting {
+  key: string;
+  value: Record<string, any>;
+  updated_by?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AdminStatOverTime {
+  date: string;
+  actions: number;
+}
+
+export async function getAdminActivityLog(
+  params: GetAdminActivityLogParams = {}
+): Promise<GetAdminActivityLogResult> {
+  const { page = 1, perPage = 20 } = params;
+  const start = (page - 1) * perPage;
+
+  const { data, error, count } = await (supabase as any)
+    .from('admin_activity_log')
+    .select(
+      `*,
+      admin:profiles!admin_id(username, full_name)`,
+      { count: 'exact' }
+    )
+    .order('created_at', { ascending: false })
+    .range(start, start + perPage - 1);
+
+  if (error) throw error;
+
+  return {
+    data: (data ?? []) as AdminActivityLogEntry[],
+    count: count ?? 0,
+  };
+}
+
+export async function getPlatformSettings(): Promise<PlatformSetting[]> {
+  const { data, error } = await (supabase as any)
+    .from('platform_settings')
+    .select('*')
+    .order('key', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as PlatformSetting[];
+}
+
+export async function upsertPlatformSetting(
+  key: string,
+  value: Record<string, any>
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { error } = await (supabase as any)
+    .from('platform_settings')
+    .upsert({
+      key,
+      value,
+      updated_by: user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (error) throw error;
+
+  await logAdminAction('Update platform setting', 'platform_setting', key, { value });
+}
+
+export async function getAdminAccounts(): Promise<AdminUser[]> {
+  const { data, error } = await (supabase as any)
+    .from('profiles')
+    .select('*')
+    .eq('is_admin', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as AdminUser[];
+}
+
+export async function getAdminStatsOverTime(): Promise<AdminStatOverTime[]> {
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+
+  const { data, error } = await (supabase as any)
+    .from('admin_activity_log')
+    .select('created_at, action')
+    .gte('created_at', since.toISOString())
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as { created_at: string; action: string }[];
+
+  if (rows.length === 0) {
+    const fallback: AdminStatOverTime[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      fallback.push({
+        date: d.toISOString().split('T')[0],
+        actions: 0,
+      });
+    }
+    return fallback;
+  }
+
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    const day = row.created_at.split('T')[0];
+    counts[day] = (counts[day] ?? 0) + 1;
+  }
+
+  const series: AdminStatOverTime[] = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const day = d.toISOString().split('T')[0];
+    series.push({ date: day, actions: counts[day] ?? 0 });
+  }
+
+  return series;
+}

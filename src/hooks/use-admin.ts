@@ -35,6 +35,14 @@ import {
   type AdminGiftTransaction,
   type GetGiftTransactionsParams,
   type AdminGiftExchangeRate,
+  getAdminActivityLog,
+  getPlatformSettings,
+  getAdminAccounts,
+  getAdminStatsOverTime,
+  type AdminActivityLogEntry,
+  type GetAdminActivityLogParams,
+  type PlatformSetting,
+  type AdminStatOverTime,
 } from '@/lib/admin';
 
 export function useAdminStats() {
@@ -464,4 +472,111 @@ export function useGiftExchangeRates() {
   }, []);
 
   return { rates, loading, error, refetch: fetch };
+}
+
+export function useAdminActivityLog(params: GetAdminActivityLogParams) {
+  const [entries, setEntries] = useState<AdminActivityLogEntry[]>([]);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { page, perPage } = params;
+
+  const fetch = useMemo(
+    () => async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getAdminActivityLog({ page, perPage });
+        setEntries(result.data);
+        setCount(result.count);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load admin activity log');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, perPage]
+  );
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { entries, count, loading, error, refetch: fetch };
+}
+
+export function usePlatformSettings() {
+  const [settings, setSettings] = useState<PlatformSetting[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getPlatformSettings();
+      setSettings(data);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load platform settings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetch();
+  }, []);
+
+  return { settings, loading, error, refetch: fetch };
+}
+
+export function useAdminAccounts() {
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAdminAccounts();
+      setAdmins(data);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load admin accounts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetch();
+  }, []);
+
+  return { admins, loading, error, refetch: fetch };
+}
+
+export function useAdminStatsOverTime() {
+  const [series, setSeries] = useState<AdminStatOverTime[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetch = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAdminStatsOverTime();
+      setSeries(data);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load admin stats over time');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetch();
+  }, []);
+
+  return { series, loading, error, refetch: fetch };
 }
