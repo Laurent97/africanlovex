@@ -7,7 +7,7 @@ import {
   Book, Camera, X, ChevronLeft, ChevronRight, MessageCircle,
   Send, Maximize2, Minimize2, Settings, ThumbsUp, Flame,
   Zap, Globe, MapPin, Clock, AlertCircle, Shield, ChevronDown,
-  ChevronUp, Move, Pin, PinOff, Loader2, User, Menu, Lock,
+  ChevronUp, Move, Pin, PinOff, Loader2, User, UserPlus, Menu, Lock,
   Wifi, WifiOff, Volume2, VolumeX, Download, Award, Gem
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -308,6 +308,42 @@ const GiftInventory: React.FC<{ onSendGift: (gift: Gift) => void; onClose: () =>
   );
 };
 
+const GuestSlot: React.FC<{ guest?: RoomParticipant; onRemove?: () => void }> = ({ guest, onRemove }) => {
+  return (
+    <div className="relative w-24 h-full lg:w-full lg:h-28 flex-shrink-0 rounded-xl bg-slate-800/80 border border-white/10 overflow-hidden flex flex-col items-center justify-center">
+      {guest ? (
+        <>
+          <Avatar className="w-10 h-10 ring-2 ring-white/20">
+            <AvatarImage src={guest.user_avatar} />
+            <AvatarFallback className="bg-gradient-to-r from-rose-500 to-purple-500 text-white text-sm">
+              {guest.user_name[0]}
+            </AvatarFallback>
+          </Avatar>
+          <p className="text-white text-[10px] font-medium truncate px-2 mt-1 max-w-full">
+            {guest.user_name}
+          </p>
+          <div className="absolute top-1.5 right-1.5 text-white/40">
+            <Camera className="w-3.5 h-3.5" />
+          </div>
+          {onRemove && (
+            <button
+              onClick={onRemove}
+              className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-rose-500/90 flex items-center justify-center text-white"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="flex flex-col items-center text-white/30">
+          <Camera className="w-6 h-6 mb-1" />
+          <span className="text-[10px]">Empty</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Live = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -338,6 +374,8 @@ const Live = () => {
   const [showGiftMenu, setShowGiftMenu] = useState(false);
   const [isChatVisible, setIsChatVisible] = useState(true);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showMultiGuest, setShowMultiGuest] = useState(false);
+  const [guests, setGuests] = useState<string[]>([]);
   const [showIcebreakers, setShowIcebreakers] = useState(false);
   const [showProfileCard, setShowProfileCard] = useState(false);
   const [speedDatingTimer, setSpeedDatingTimer] = useState(300);
@@ -1281,6 +1319,18 @@ const Live = () => {
     }
   };
 
+  const handleToggleGuest = (participantId: string) => {
+    setGuests(prev => {
+      if (prev.includes(participantId)) {
+        return prev.filter(id => id !== participantId);
+      }
+      if (prev.length >= 5) return prev;
+      return [...prev, participantId];
+    });
+  };
+
+  const handleClearGuests = () => setGuests([]);
+
   const handleCopyInviteLink = () => {
     if (!selectedStream) return;
     const link = `${window.location.origin}/live?stream=${selectedStream.id}`;
@@ -1694,6 +1744,80 @@ const Live = () => {
             )}
           </AnimatePresence>
 
+          {/* Multi-Guest Panel */}
+          <AnimatePresence>
+            {showMultiGuest && isHost && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="absolute top-16 right-3 z-50 w-80 max-h-[80vh] bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl flex flex-col overflow-hidden"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                    <Users className="w-4 h-4 text-rose-400" />
+                    Multi-Guest ({guests.length}/5)
+                  </h3>
+                  <div className="flex items-center gap-1">
+                    {guests.length > 0 && (
+                      <Button
+                        onClick={handleClearGuests}
+                        variant="ghost"
+                        size="sm"
+                        className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 h-8 px-2 text-xs"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                    <Button
+                      onClick={() => setShowMultiGuest(false)}
+                      variant="ghost"
+                      size="icon"
+                      className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+                  {participants
+                    .filter(p => !p.is_host && p.user_id !== user?.id)
+                    .map(p => {
+                      const isSelected = guests.includes(p.id);
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg transition-colors"
+                        >
+                          <ParticipantAvatar participant={p} size="md" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-medium truncate">{p.user_name}</p>
+                          </div>
+                          <Button
+                            onClick={() => handleToggleGuest(p.id)}
+                            size="icon"
+                            className={cn(
+                              "h-8 w-8 rounded-full",
+                              isSelected
+                                ? "bg-rose-500 hover:bg-rose-600 text-white"
+                                : "bg-white/10 hover:bg-white/20 text-white"
+                            )}
+                            disabled={!isSelected && guests.length >= 5}
+                          >
+                            {isSelected ? <X className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  {participants.filter(p => !p.is_host && p.user_id !== user?.id).length === 0 && (
+                    <p className="text-white/40 text-sm text-center py-8">No participants available</p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Video Container */}
           <div
             ref={videoContainerRef}
@@ -1701,19 +1825,60 @@ const Live = () => {
           >
             {/* Video Player */}
             <div className="absolute inset-0">
-              {isHost && localStream ? (
-                <video
-                  ref={(el) => setVideoRef(el)}
-                  autoPlay
-                  playsInline
-                  muted={isMuted}
-                  className="w-full h-full object-contain"
-                />
+              {guests.length > 0 ? (
+                <div className="w-full h-full flex flex-col lg:flex-row gap-2 p-2 bg-black">
+                  <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-slate-900">
+                    {isHost && localStream ? (
+                      <video
+                        ref={(el) => setVideoRef(el)}
+                        autoPlay
+                        playsInline
+                        muted={isMuted}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <LiveThumbnail
+                        stream={selectedStream}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                    <div className="absolute bottom-2 left-2 px-2 py-1 rounded-full bg-black/60 text-white text-[10px]">
+                      {isHost ? 'You (Host)' : selectedStream.host_name}
+                    </div>
+                  </div>
+                  <div className="w-full h-28 lg:w-64 lg:h-full overflow-x-auto lg:overflow-y-auto flex flex-row lg:flex-col gap-2 p-2 rounded-xl bg-slate-950/80 border border-white/10">
+                    {Array.from({ length: 5 }).map((_, i) => {
+                      const selectedId = guests[i];
+                      const guest = selectedId ? participants.find(p => p.id === selectedId) : undefined;
+                      const guestId = guest?.id;
+                      const handleRemove = guestId ? () => setGuests(prev => prev.filter(id => id !== guestId)) : undefined;
+                      return (
+                        <GuestSlot
+                          key={i}
+                          guest={guest}
+                          onRemove={handleRemove}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
               ) : (
-                <LiveThumbnail
-                  stream={selectedStream}
-                  className="w-full h-full object-cover"
-                />
+                <>
+                  {isHost && localStream ? (
+                    <video
+                      ref={(el) => setVideoRef(el)}
+                      autoPlay
+                      playsInline
+                      muted={isMuted}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <LiveThumbnail
+                      stream={selectedStream}
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                </>
               )}
             </div>
 
@@ -1904,6 +2069,15 @@ const Live = () => {
                       className="w-11 h-11 rounded-full bg-white/15 border border-white/20 text-white"
                     >
                       <Users className="w-5 h-5" />
+                    </Button>
+                    <Button
+                      onClick={() => setShowMultiGuest(true)}
+                      variant="ghost"
+                      size="sm"
+                      className="h-11 px-4 rounded-full bg-white/15 border border-white/20 text-white text-xs font-medium"
+                    >
+                      <Users className="w-4 h-4 mr-1.5" />
+                      Multi-Guest
                     </Button>
                   </div>
                 ) : (
